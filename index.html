@@ -25,7 +25,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="preload" as="image" href="assets/img/hero-1280.webp" imagesrcset="assets/img/hero-640.webp 640w, assets/img/hero-1280.webp 1280w" imagesizes="100vw">
-<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/base.css">
+<link rel="stylesheet" href="assets/css/layout.css">
+<link rel="stylesheet" href="assets/css/components.css">
+<link rel="stylesheet" href="assets/css/chat.css">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="site.webmanifest">
 
@@ -38,7 +42,7 @@
       "@id": "https://salman.com.co/#org",
       "name": "SALMAN Constructora + Inmobiliaria",
       "email": "SalmanSAS.gerencia@gmail.com",
-      "telephone": "+57 324 428 6166",
+      "telephone": "+57 315 775 7794",
       "areaServed": "Cartagena, Colombia",
       "address": { "@type": "PostalAddress", "addressLocality": "Cartagena", "addressRegion": "Bolívar", "addressCountry": "CO" },
       "description": "Constructora e inmobiliaria con proyectos residenciales y turísticos frente al mar en Cartagena.",
@@ -143,7 +147,7 @@
   </nav>
   <div class="mobile-menu__foot">
     <a class="btn btn--dark" href="#agenda" data-i18n="nav.cta">Agendar visita</a>
-    <a class="btn btn--outline" href="https://wa.me/573244286166" target="_blank" rel="noopener">
+    <a class="btn btn--outline" href="https://wa.me/573157757794" target="_blank" rel="noopener">
       <svg class="icon" aria-hidden="true"><use href="#i-whatsapp"></use></svg> WhatsApp
     </a>
   </div>
@@ -500,16 +504,16 @@
 
         <ul class="channels" data-reveal>
           <li>
-            <a href="https://wa.me/573244286166" target="_blank" rel="noopener">
+            <a href="https://wa.me/573157757794" target="_blank" rel="noopener">
               <span class="channel__icon"><svg class="icon" aria-hidden="true"><use href="#i-whatsapp"></use></svg></span>
-              <span><strong>WhatsApp</strong><small>+57 324 428 6166</small></span>
+              <span><strong>WhatsApp</strong><small>+57 315 775 7794</small></span>
               <svg class="icon channel__arrow" aria-hidden="true"><use href="#i-up-right"></use></svg>
             </a>
           </li>
           <li>
-            <a href="tel:+573244286166">
+            <a href="tel:+573157757794">
               <span class="channel__icon"><svg class="icon" aria-hidden="true"><use href="#i-phone"></use></svg></span>
-              <span><strong data-i18n="contact.call">Llamada</strong><small>+57 324 428 6166</small></span>
+              <span><strong data-i18n="contact.call">Llamada</strong><small>+57 315 775 7794</small></span>
               <svg class="icon channel__arrow" aria-hidden="true"><use href="#i-up-right"></use></svg>
             </a>
           </li>
@@ -614,9 +618,9 @@
         </a>
         <p data-i18n="footer.tag">Construimos espacios que trascienden. Proyectos residenciales y turísticos en Cartagena de Indias.</p>
         <div class="footer__social">
-          <a href="https://wa.me/573244286166" target="_blank" rel="noopener" aria-label="WhatsApp"><svg class="icon" aria-hidden="true"><use href="#i-whatsapp"></use></svg></a>
+          <a href="https://wa.me/573157757794" target="_blank" rel="noopener" aria-label="WhatsApp"><svg class="icon" aria-hidden="true"><use href="#i-whatsapp"></use></svg></a>
           <a href="mailto:SalmanSAS.gerencia@gmail.com" aria-label="Correo"><svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg></a>
-          <a href="tel:+573244286166" aria-label="Teléfono"><svg class="icon" aria-hidden="true"><use href="#i-phone"></use></svg></a>
+          <a href="tel:+573157757794" aria-label="Teléfono"><svg class="icon" aria-hidden="true"><use href="#i-phone"></use></svg></a>
         </div>
       </div>
 
@@ -631,7 +635,7 @@
 
       <div class="footer__col">
         <h3 data-i18n="footer.contact">Contacto</h3>
-        <a href="tel:+573244286166">+57 324 428 6166</a>
+        <a href="tel:+573157757794">+57 315 775 7794</a>
         <a href="mailto:SalmanSAS.gerencia@gmail.com">SalmanSAS.gerencia@gmail.com</a>
         <span data-i18n="footer.city">Cartagena, Bolívar · Colombia</span>
         <span data-i18n="footer.hours">Lun a sáb · 8:00 a 18:00</span>
@@ -655,7 +659,7 @@
 
 <!-- Mobile action bar -->
 <div class="mobile-bar" aria-label="Acciones rápidas">
-  <a class="mobile-bar__btn" href="https://wa.me/573244286166" target="_blank" rel="noopener">
+  <a class="mobile-bar__btn" href="https://wa.me/573157757794" target="_blank" rel="noopener">
     <svg class="icon" aria-hidden="true"><use href="#i-whatsapp"></use></svg>
     <span>WhatsApp</span>
   </a>
@@ -825,9 +829,23 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="assets/js/data.js"></script>
-<script src="assets/js/i18n.js"></script>
-<script src="assets/js/app.js"></script>
-<script src="assets/js/chat.js"></script>
+<script src="assets/js/core/config.js"></script>
+<script src="assets/js/core/dom.js"></script>
+<script src="assets/js/core/events.js"></script>
+<script src="assets/js/core/storage.js"></script>
+<script src="assets/js/data/projects.js"></script>
+<script src="assets/js/data/concierge.js"></script>
+<script src="assets/js/data/kb.js"></script>
+<script src="assets/js/i18n/es.js"></script>
+<script src="assets/js/i18n/en.js"></script>
+<script src="assets/js/i18n/index.js"></script>
+<script src="assets/js/ui/navigation.js"></script>
+<script src="assets/js/ui/forms.js"></script>
+<script src="assets/js/ui/calculator.js"></script>
+<script src="assets/js/ui/reveal.js"></script>
+<script src="assets/js/main.js"></script>
+<script src="assets/js/chat/voice.js"></script>
+<script src="assets/js/chat/concierge.js"></script>
+<script src="assets/js/chat/chat.js"></script>
 </body>
 </html>
