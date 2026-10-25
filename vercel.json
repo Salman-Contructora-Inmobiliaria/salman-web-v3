@@ -1,0 +1,18 @@
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+      ]
+    }
+  ],
+  "redirects": [
+    { "source": "/wa", "destination": "https://wa.me/573244286166", "permanent": false },
+    {
+      "source": "/asesor",
+      "destination": "https://wa.me/573244286166?text=Hola%20SALMAN%2C%20vengo%20de%20la%20web.%20Quiero%20hablar%20con%20un%20asesor.",
+      "permanent": false
+    }
+  ]
+}

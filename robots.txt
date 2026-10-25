@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Reemplazar por el dominio definitivo antes de publicar
+Sitemap: https://salman.com.co/sitemap.xml
