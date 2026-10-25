@@ -5,6 +5,7 @@ Todos los cambios relevantes de este repositorio se documentan en este archivo p
 ## [2.1.0] — 2026-10-25 (Rama `refactor/orden-codigo`)
 
 ### Fase 4 · Verificación Integral y Documentación Final
+- Eliminado el activo gráfico huérfano `assets/img/hero-900.webp` (134.6 KB, `HAL-12`) tras autorización explícita y fusionada la rama `refactor/orden-codigo` en `main`.
 - Ejecutadas pruebas de contrato Serverless (`api/chat.js`, `api/whatsapp.js`) y pruebas End-to-End en Google Chrome Headless (CDP) sobre los viewports `390x844`, `768x1024` y `1440x900` (`0` errores 404 en 52 peticiones, `0` errores de consola, `0` referencias a rutas antiguas o al teléfono `324`).
 - Actualizados `DOCUMENTACION.md`, `docs/AUDITORIA-CODIGO.md`, `docs/MIGRATION-MAP.md`, `docs/TEST-REPORT.md` y `CHANGELOG.md` con los resultados finales.
 

@@ -127,7 +127,7 @@ salman-web-v2-completo/
 │  │  │  ├─ concierge.js       # Renderizado y acciones del Concierge (renderConcierge, setChatTab, openArea, openVIP)
 │  │  │  └─ chat.js            # Orquestador del chat, historial, cliente /api/chat, motor KB local, lead y handoff
 │  │  └─ main.js               # Punto de entrada de la aplicación, query params y API pública window.SALMAN
-│  └─ img/                     # 19 activos gráficos (.webp, .svg, .jpg)
+│  └─ img/                     # 18 activos gráficos en uso (.webp, .svg, .jpg)
 ├─ api/                        # Funciones Serverless en Vercel (CommonJS)
 │  ├─ chat.js                  # Endpoint POST /api/chat con rate-limit en memoria
 │  └─ whatsapp.js              # Endpoint GET/POST /api/whatsapp (webhook de Meta Cloud API + HMAC opcional)

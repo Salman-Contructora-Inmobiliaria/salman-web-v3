@@ -50,12 +50,12 @@ La auditoría estática y dinámica sobre el commit base `6394c59` identificó *
 
 | Métrica | Antes (Línea Base `6394c59`) | Después (Refactor `refactor/orden-codigo`) |
 |---|---|---|
-| **Total de archivos en el proyecto** | 37 archivos | 65 archivos (incluyendo 18 módulos JS, 5 capas CSS y 11 documentos en raíz y `docs/`) |
+| **Total de archivos en el proyecto** | 37 archivos | 64 archivos (incluyendo 18 módulos JS, 5 capas CSS, 18 imágenes en uso y 11 documentos en raíz y `docs/`) |
 | **Archivos JavaScript de cliente (`assets/js/`)** | 4 archivos monolíticos · 2,425 líneas | **18 módulos** organizados en `core/`, `data/`, `i18n/`, `ui/`, `chat/` y `main.js` · 2,618 líneas |
 | **Archivos JavaScript de backend (`api/`, `lib/`)** | 3 archivos · 344 líneas | 3 archivos · 360 líneas (añadida verificación HMAC en `api/whatsapp.js`) |
 | **Hojas de estilo (`assets/css/`)** | 1 archivo monolítico · 818 líneas | **5 archivos por capas** (`tokens.css`, `base.css`, `layout.css`, `components.css`, `chat.css`) · 833 líneas |
 | **Documento HTML (`index.html`)** | 1 archivo · 833 líneas | 1 archivo · 851 líneas (referencias modulares CSS/JS y teléfono actualizado) |
-| **Imágenes (`assets/img/*`)** | 19 archivos · 1,508,046 bytes | 19 archivos · 1,508,046 bytes (intactas) |
+| **Imágenes (`assets/img/*`)** | 19 archivos · 1,508,046 bytes | **18 archivos en uso** · 1,373,420 bytes (eliminada `hero-900.webp` huérfana de 134.6 KB) |
 | **IDs HTML en `index.html`** | 98 IDs · 98 únicos · 0 duplicados | 98 IDs · 98 únicos · **0 duplicados** |
 | **Claves i18n (`TEXT.es` / `TEXT.en`)** | 239 ES / 239 EN (100% paridad) | 239 ES / 239 EN (**100% paridad**) |
 | **Apariciones del teléfono antiguo `324` en código** | **18 apariciones** | **0 apariciones** (100% migrado a `+57 315 775 7794`) |
@@ -98,7 +98,7 @@ La auditoría estática y dinámica sobre el commit base `6394c59` identificó *
 |---|---|---|---|---|
 | `og-salman.jpg` | 259,630 | 253.5 KB | `index.html:14, 22` (`og:image`, `twitter:image`) | En uso |
 | `hero-1280.webp` | 228,446 | 223.1 KB | `index.html:27, 157, 158` (Hero principal + preload) | En uso |
-| `hero-900.webp` | 134,626 | 131.5 KB | *Ninguna referencia estática ni dinámica* | **Huérfano (`HAL-12`, conservado por Regla 4)** |
+| `hero-900.webp` | 134,626 | 131.5 KB | *Ninguna referencia estática ni dinámica* | **Eliminado (`HAL-12` corregido)** |
 | `torres-900.webp` | 92,028 | 89.9 KB | `assets/js/ui/navigation.js` (`p.img = 'torres'`) | En uso |
 | `playa-sq.webp` | 90,302 | 88.2 KB | `index.html:278` (miniatura 3 galería insignia) | En uso |
 | `playa-900.webp` | 82,176 | 80.3 KB | `assets/js/ui/navigation.js` (`p.img = 'playa'`, galería) | En uso |
@@ -158,7 +158,7 @@ La auditoría estática y dinámica sobre el commit base `6394c59` identificó *
 | **HAL-09** | **Media** | Rendimiento / Mantenibilidad | Delegación de eventos en UI y chat | Dos `document.addEventListener('click', ...)` separados en `initDelegates()` y listener `keydown(Enter)` redundante en `#chatText`. | Ejecución doble de listeners en cada clic del documento y doble handler de envío en el chat. | Unificado el delegador de clics en `assets/js/ui/navigation.js` y eliminado el listener `keydown(Enter)` redundante en `assets/js/chat/chat.js`. | Bajo | **Corregido** (`25ec95b`, `5fbfd58`) |
 | **HAL-10** | **Baja** | Seguridad / DOM | Interpolaciones HTML en UI y chat | 14 usos de `innerHTML` en componentes dinámicos. | Requiere asegurar que toda interpolación pase por `esc()`. | Centralizado `esc()` en `assets/js/core/dom.js` y verificado en todas las plantillas dinámicas. | Bajo | **Corregido** (`41895de`) |
 | **HAL-11** | **Baja** | Accesibilidad | `index.html:642-645` | Enlaces legales del footer (`href="#"`) sin documento jurídico definitivo. | Enlaces de prototipo pendientes de textos legales definitivos del cliente. | Conservado diseño actual y documentado como pendiente de textos jurídicos reales del cliente. | Bajo | **Documentado** |
-| **HAL-12** | **Baja** | Rendimiento | `assets/img/hero-900.webp` | Archivo de 134,626 bytes (131.5 KB) sin referencias en HTML, CSS o JS. | Peso extra en repositorio (no afecta descarga en navegador). | Conservado intacto en cumplimiento de la Regla 4 (no borrar activos sin autorización explícita). | N/A | **Conservado por restricción** |
+| **HAL-12** | **Baja** | Rendimiento | `assets/img/hero-900.webp` | Archivo de 134,626 bytes (131.5 KB) sin referencias en HTML, CSS o JS. | Peso extra en repositorio (no afecta descarga en navegador). | Eliminado con `git rm assets/img/hero-900.webp` tras autorización del usuario. | Bajo | **Corregido** |
 | **HAL-13** | **Baja** | Mantenibilidad / Rendimiento | `assets/css/chat.css`, `index.html:87-91` | 3 selectores CSS (`.msg__list`, `.msg--bot.is-typing`, `.msg__note`) y 3 `<symbol>` SVG (`#i-play`, `#i-check`, `#i-globe`) de reserva. | ~600 bytes de reserva en CSS/HTML. | Conservados para no alterar el DOM ni estilos de reserva. | N/A | **Documentado** |
 | **HAL-14** | **Baja** | i18n / Mantenibilidad | `assets/js/i18n/es.js`, `assets/js/i18n/en.js` | 11 claves de reserva en `TEXT.es` y `TEXT.en` no invocadas actualmente. | Claves disponibles para expansión futura sin impacto funcional. | Conservadas las 239 claves intactas en `es.js` y `en.js` por restricción de no eliminar contenido. | N/A | **Conservado por restricción** |
 | **HAL-15** | **Baja** | SEO | `vercel.json:6` | `vercel.json` envía `X-Robots-Tag: noindex, nofollow`. | Bloquea indexación en buscadores durante la etapa de demo. | Conservado intacto según restricción expresa del proyecto. | N/A | **Conservado por restricción** |
