@@ -1,17 +1,14 @@
 /* ==========================================================================
-   SALMAN — Salma, asesora digital (prototipo)
-   Texto + voz (Web Speech API) · español/inglés · captura de lead · handoff
-   --------------------------------------------------------------------------
-   Este prototipo usa una base de conocimiento local con puntuación por
-   palabras clave. En producción se reemplaza por un LLM + RAG (ver propuesta).
+   SALMAN — Salma, asesora digital con IA y fallback local (chat/chat.js)
+   Estado, mensajes, API /api/chat, motor KB local, captura de lead y handoff.
    ========================================================================== */
 (() => {
   'use strict';
 
-  const $ = (sel, ctx = document) => ctx.querySelector(sel);
-  const WA = `https://wa.me/${CONFIG.whatsapp}`;
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const synth = window.speechSynthesis || null;
+  const S = (window.SALMAN = window.SALMAN || {});
+  const $ = S.$ || ((sel, ctx = document) => ctx.querySelector(sel));
+  const esc = S.esc || ((str) => String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])));
+  const WA = S.CONFIG?.waUrl || `https://wa.me/${CONFIG.whatsapp}`;
   const KB_BY_ID = Object.fromEntries(KB.map((k) => [k.id, k]));
 
   const chat = {
@@ -32,6 +29,9 @@
   };
 
   const el = {};
+  let voiceCtrl = null;
+  let conciergeCtrl = null;
+
   const normalize = (str) => String(str || '')
     .toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -39,7 +39,6 @@
     .replace(/\s+/g, ' ')
     .trim();
 
-  const esc = (str) => String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const t = (key) => window.SALMAN?.t(key) ?? key;
   const tf = (key, vars) => window.SALMAN?.tf(key, vars) ?? key;
   const track = (event, params = {}) => window.SALMAN?.track(event, params);
@@ -63,14 +62,16 @@
   }
 
   function persist() {
-    try {
-      sessionStorage.setItem('salman.chat.v1', JSON.stringify({
-        history: chat.history.slice(-24),
-        chips: chat.chips,
-        lang: chat.lang,
-        lead: chat.lead
-      }));
-    } catch (err) { /* storage lleno o bloqueado: no interrumpir */ }
+    const payload = {
+      history: chat.history.slice(-24),
+      chips: chat.chips,
+      lang: chat.lang,
+      lead: chat.lead
+    };
+    if (S.storage?.saveChatSession) S.storage.saveChatSession(payload);
+    else {
+      try { sessionStorage.setItem('salman.chat.v1', JSON.stringify(payload)); } catch (err) { /* noop */ }
+    }
   }
 
   function addUser(text) {
@@ -85,7 +86,7 @@
     chat.history.push(message);
     const node = renderMessage(message, opts);
     persist();
-    if (chat.voiceOpen && opts.speak !== false) speak(text);
+    if (chat.voiceOpen && opts.speak !== false) voiceCtrl?.speak(text);
     return node;
   }
 
@@ -197,15 +198,7 @@
     const delay = opts.fast ? 380 : 520 + Math.random() * 420;
     window.setTimeout(() => {
       setTyping(false);
-      const node = addBot(text, { speak: opts.speak });
-      if (opts.cta && node) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'msg__cta';
-        btn.dataset.chatAction = opts.cta.action;
-        btn.innerHTML = `${esc(opts.cta.label)} <svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg>`;
-        node.appendChild(btn);
-      }
+      addBot(text, { speak: opts.speak, cta: opts.cta });
       if (opts.card) renderCard(opts.card);
       if (opts.chips) renderChips(opts.chips);
       if (opts.after) opts.after();
@@ -296,8 +289,8 @@
     return reply(entry, opts);
   }
 
-  /* ------------------------------ formulario de lead ------------------------------ */
-  function showLeadForm(opts = {}) {
+  /* ------------------------------ formulario de lead en chat ------------------------------ */
+  function showLeadForm() {
     if ($('.msg-form:not(.is-done)')) return;
     const wrap = document.createElement('div');
     wrap.className = 'msg msg--bot msg-form';
@@ -322,7 +315,10 @@
       if (!consent) { status.textContent = t('ui.validation.consent'); return; }
 
       chat.lead = { name, phone, project: chat.lastProject, at: new Date().toISOString() };
-      try { sessionStorage.setItem('salman.lead', JSON.stringify(chat.lead)); } catch (err) { /* noop */ }
+      if (S.storage?.saveLead) S.storage.saveLead(chat.lead);
+      else {
+        try { sessionStorage.setItem('salman.lead', JSON.stringify(chat.lead)); } catch (err) { /* noop */ }
+      }
       track('chat_lead', { project: chat.lastProject });
 
       wrap.classList.add('is-done');
@@ -365,212 +361,7 @@
     if (window.innerWidth < 760) close();
   }
 
-  /* ------------------------------ voz ------------------------------ */
-  function pickVoice() {
-    if (!synth) return null;
-    const voices = synth.getVoices();
-    const lang = chat.lang === 'es' ? 'es' : 'en';
-    const pool = voices.filter((v) => v.lang.toLowerCase().startsWith(lang));
-    const preferred = pool.find((v) => /google|mónica|monica|paulina|helena|sabina|female|mujer/i.test(v.name))
-      || pool.find((v) => /es-(co|mx|us)|en-us/i.test(v.lang))
-      || pool[0];
-    return preferred || null;
-  }
-
-  function speak(text) {
-    if (!synth || chat.muted) return;
-    const clean = String(text).replace(/[•*#]/g, '').replace(/\s+/g, ' ').slice(0, 700);
-    synth.cancel();
-    const utterance = new SpeechSynthesisUtterance(clean);
-    const voice = pickVoice();
-    if (voice) utterance.voice = voice;
-    utterance.lang = LANG_META[chat.lang].tts;
-    utterance.rate = 0.98;
-    utterance.pitch = 1;
-    chat.speaking = true;
-    updateVoiceUI();
-    utterance.onend = () => { chat.speaking = false; updateVoiceUI(); };
-    utterance.onerror = () => { chat.speaking = false; updateVoiceUI(); };
-    synth.speak(utterance);
-  }
-
-  function stopSpeech() {
-    if (synth) synth.cancel();
-    chat.speaking = false;
-    updateVoiceUI();
-  }
-
-  function updateVoiceUI() {
-    if (!el.voice) return;
-    el.voice.hidden = !chat.voiceOpen;
-    el.orb.classList.toggle('is-listening', chat.listening);
-    el.orb.classList.toggle('is-speaking', chat.speaking);
-    if (!chat.voiceOpen) return;
-    if (chat.listening) el.voiceStatus.textContent = t('chat.listening');
-    else if (chat.speaking) el.voiceStatus.textContent = t('chat.speaking');
-    else if (!el.voiceStatus.textContent.trim()) el.voiceStatus.textContent = t('voice.tap');
-    el.voiceListen.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#${chat.listening ? 'i-pause' : 'i-mic'}"></use></svg><span>${chat.listening ? (chat.lang === 'es' ? 'Detener' : 'Stop') : t('voice.speak')}</span>`;
-  }
-
-  function startListening() {
-    if (!SR) {
-      addBot(t('chat.voiceUnsupported'), { speak: false, chips: ['advisor', 'projects'] });
-      return;
-    }
-    if (chat.listening || !chat.voiceOpen) return;
-    stopSpeech();
-    chat.voiceFinal = '';
-    el.voiceTranscript.textContent = '';
-    try {
-      const recognition = new SR();
-      chat.recognition = recognition;
-      recognition.lang = LANG_META[chat.lang].speech;
-      recognition.interimResults = true;
-      recognition.continuous = false;
-      recognition.maxAlternatives = 1;
-
-      recognition.onstart = () => {
-        chat.listening = true;
-        el.voiceStatus.textContent = t('chat.listening');
-        updateVoiceUI();
-      };
-      recognition.onresult = (event) => {
-        let interim = '';
-        for (let i = event.resultIndex; i < event.results.length; i += 1) {
-          const result = event.results[i];
-          if (result.isFinal) chat.voiceFinal += `${result[0].transcript} `;
-          else interim += result[0].transcript;
-        }
-        el.voiceTranscript.textContent = (chat.voiceFinal + interim).trim();
-      };
-      recognition.onerror = (event) => {
-        chat.listening = false;
-        updateVoiceUI();
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          el.voiceStatus.textContent = t('chat.micDenied');
-          track('chat_voice_error', { error: event.error });
-        } else if (event.error === 'network') {
-          el.voiceStatus.textContent = chat.lang === 'es'
-            ? 'El navegador no pudo conectar el servicio de voz. Si abriste el archivo localmente, usa el servidor de demo (HTTPS o localhost).'
-            : 'The browser could not reach the speech service. If you opened the file locally, use the demo server (HTTPS or localhost).';
-          track('chat_voice_error', { error: event.error });
-        }
-      };
-      recognition.onend = () => {
-        chat.listening = false;
-        updateVoiceUI();
-        if (!chat.voiceOpen) return;
-        const text = chat.voiceFinal.trim();
-        if (text) {
-          addUser(text);
-          el.voiceStatus.textContent = t('chat.thinking');
-          route(text, { speak: true, fast: true, onReply: (replyText) => {
-            if (chat.voiceOpen) {
-              el.voiceStatus.textContent = replyText.replace(/\s+/g, ' ').slice(0, 220) + (replyText.length > 220 ? '…' : '');
-              el.voiceTranscript.textContent = text;
-            }
-          } });
-        } else {
-          el.voiceStatus.textContent = t('voice.tap');
-        }
-      };
-      recognition.start();
-      track('chat_voice_start');
-    } catch (err) {
-      chat.listening = false;
-      updateVoiceUI();
-      el.voiceStatus.textContent = t('chat.micDenied');
-    }
-  }
-
-  function stopListening() {
-    if (chat.recognition) {
-      try { chat.recognition.abort(); } catch (err) { /* noop */ }
-    }
-    chat.listening = false;
-    updateVoiceUI();
-  }
-
-  function openVoice() {
-    if (!SR) {
-      addBot(t('chat.voiceUnsupported'), { speak: false, chips: ['advisor', 'projects'] });
-      return;
-    }
-    chat.voiceOpen = true;
-    el.voice.hidden = false;
-    el.voiceStatus.textContent = t('voice.tap');
-    el.voiceTranscript.textContent = '';
-    updateVoiceUI();
-    window.setTimeout(startListening, 350);
-  }
-
-  function closeVoice() {
-    chat.voiceOpen = false;
-    stopListening();
-    stopSpeech();
-    el.voice.hidden = true;
-    el.voiceStatus.textContent = t('voice.tap');
-    el.voiceTranscript.textContent = '';
-    if (chat.open) el.text?.focus();
-  }
-
-  /* ------------------------------ panel ------------------------------ */
-  function renderConcierge() {
-    if (!el.grid) return;
-    el.grid.innerHTML = CONCIERGE.filter((area) => !area.help).map((area, i) => `
-      <button type="button" class="area-card" data-area="${area.id}">
-        <span class="area-card__num">0${i + 1}</span>
-        <strong>${esc(area.label[chat.lang])}</strong>
-        <span>${esc(area.desc[chat.lang])}</span>
-        <svg class="icon" aria-hidden="true"><use href="#i-up-right"></use></svg>
-      </button>`).join('');
-  }
-
-  function setChatTab(tab) {
-    chat.tab = tab === 'concierge' ? 'concierge' : 'salma';
-    const isConcierge = chat.tab === 'concierge';
-    if (el.body) el.body.hidden = isConcierge;
-    if (el.chips) el.chips.hidden = isConcierge;
-    if (el.form) el.form.hidden = isConcierge;
-    if (el.legal) el.legal.hidden = isConcierge;
-    if (el.concierge) el.concierge.hidden = !isConcierge;
-    if (el.status) el.status.textContent = isConcierge ? t('concierge.status') : t('chat.online');
-    el.panel.classList.toggle('is-concierge', isConcierge);
-    document.querySelectorAll('.chat-tab[data-chat-tab]').forEach((btn) => {
-      const active = btn.dataset.chatTab === chat.tab;
-      btn.classList.toggle('is-active', active);
-      btn.setAttribute('aria-selected', String(active));
-    });
-    if (isConcierge) {
-      closeVoice();
-      renderConcierge();
-    } else if (chat.open) {
-      el.text?.focus();
-    }
-    track('chat_tab', { tab: chat.tab });
-  }
-
-  function openArea(id) {
-    const area = CONCIERGE.find((a) => a.id === id);
-    if (!area) return;
-    const message = area.msg[chat.lang] || area.msg.es;
-    track('concierge_area', { area: id });
-    const win = window.open(`${WA}?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
-    if (!win) window.location.href = `${WA}?text=${encodeURIComponent(message)}`;
-    if (window.innerWidth < 760) close();
-  }
-
-  function openVIP() {
-    const code = (el.vipInput?.value || '').trim().toUpperCase();
-    const area = CONCIERGE.find((a) => a.id === 'vip');
-    const placeholder = chat.lang === 'es' ? 'SOLICITAR-ACCESO-VIP' : 'REQUEST-VIP-ACCESS';
-    const message = (area.msg[chat.lang] || area.msg.es).replace('{code}', code || placeholder);
-    track('concierge_vip', { has_code: Boolean(code) });
-    const win = window.open(`${WA}?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
-    if (!win) window.location.href = `${WA}?text=${encodeURIComponent(message)}`;
-    if (window.innerWidth < 760) close();
-  }
-
+  /* ------------------------------ control del panel ------------------------------ */
   function open() {
     if (chat.open) { el.text?.focus(); return; }
     chat.open = true;
@@ -592,9 +383,9 @@
     el.panel.hidden = true;
     el.fab.hidden = false;
     el.fab.setAttribute('aria-expanded', 'false');
-    closeVoice();
-    stopListening();
-    stopSpeech();
+    voiceCtrl?.closeVoice();
+    voiceCtrl?.stopListening();
+    voiceCtrl?.stopSpeech();
     track('chat_close');
   }
 
@@ -619,17 +410,15 @@
   }
 
   function restore() {
-    try {
-      const stored = JSON.parse(sessionStorage.getItem('salman.chat.v1') || 'null');
-      if (stored && Array.isArray(stored.history) && stored.history.length) {
-        chat.history = stored.history;
-        chat.chips = stored.chips || [];
-        chat.lead = stored.lead || null;
-        chat.history.forEach((message) => renderMessage(message));
-        renderChips(chat.chips);
-        return true;
-      }
-    } catch (err) { /* noop */ }
+    const stored = S.storage?.getChatSession ? S.storage.getChatSession() : null;
+    if (stored && Array.isArray(stored.history) && stored.history.length) {
+      chat.history = stored.history;
+      chat.chips = stored.chips || [];
+      chat.lead = stored.lead || null;
+      chat.history.forEach((message) => renderMessage(message));
+      renderChips(chat.chips);
+      return true;
+    }
     return false;
   }
 
@@ -655,44 +444,37 @@
       });
     });
 
-    el.panel.addEventListener('submit', (event) => {
+    (el.form || el.panel).addEventListener('submit', (event) => {
       event.preventDefault();
       send(el.text.value);
     });
 
-    el.text.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        send(el.text.value);
-      }
-    });
-
     $('#chatClose')?.addEventListener('click', close);
-    $('#chatVoiceBtn')?.addEventListener('click', openVoice);
+    $('#chatVoiceBtn')?.addEventListener('click', () => voiceCtrl?.openVoice());
     document.querySelectorAll('.chat-tab[data-chat-tab]').forEach((btn) => {
-      btn.addEventListener('click', () => setChatTab(btn.dataset.chatTab));
+      btn.addEventListener('click', () => conciergeCtrl?.setChatTab(btn.dataset.chatTab));
     });
-    $('.concierge__back')?.addEventListener('click', () => setChatTab('salma'));
-    document.getElementById('conciergeHelp')?.addEventListener('click', () => openArea('orientacion'));
+    $('.concierge__back')?.addEventListener('click', () => conciergeCtrl?.setChatTab('salma'));
+    document.getElementById('conciergeHelp')?.addEventListener('click', () => conciergeCtrl?.openArea('orientacion'));
     el.grid?.addEventListener('click', (event) => {
       const card = event.target.closest('[data-area]');
       if (!card) return;
       if (card.dataset.area === 'vip') { el.vipInput?.focus(); return; }
-      openArea(card.dataset.area);
+      conciergeCtrl?.openArea(card.dataset.area);
     });
-    el.vipBtn?.addEventListener('click', openVIP);
+    el.vipBtn?.addEventListener('click', () => conciergeCtrl?.openVIP());
     el.vipInput?.addEventListener('input', () => {
       el.vipInput.value = el.vipInput.value.toUpperCase();
     });
     el.vipInput?.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') { event.preventDefault(); openVIP(); }
+      if (event.key === 'Enter') { event.preventDefault(); conciergeCtrl?.openVIP(); }
     });
-    $('#voiceClose')?.addEventListener('click', closeVoice);
-    $('#voiceKeyboard')?.addEventListener('click', () => { closeVoice(); el.text?.focus(); });
+    $('#voiceClose')?.addEventListener('click', () => voiceCtrl?.closeVoice());
+    $('#voiceKeyboard')?.addEventListener('click', () => { voiceCtrl?.closeVoice(); el.text?.focus(); });
     $('#voiceListen')?.addEventListener('click', () => {
-      if (chat.listening) stopListening();
-      else if (chat.speaking) { stopSpeech(); startListening(); }
-      else startListening();
+      if (chat.listening) voiceCtrl?.stopListening();
+      else if (chat.speaking) { voiceCtrl?.stopSpeech(); voiceCtrl?.startListening(); }
+      else voiceCtrl?.startListening();
     });
 
     $('#chatMute')?.addEventListener('click', () => {
@@ -702,7 +484,7 @@
       btn?.classList.toggle('is-muted', chat.muted);
       const use = btn?.querySelector('use');
       if (use) use.setAttribute('href', chat.muted ? '#i-volume-off' : '#i-volume');
-      if (chat.muted) stopSpeech();
+      if (chat.muted) voiceCtrl?.stopSpeech();
     });
 
     el.chips.addEventListener('click', (event) => {
@@ -737,7 +519,7 @@
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape') return;
       if (document.querySelector('dialog[open]')) return;
-      if (chat.voiceOpen) { closeVoice(); return; }
+      if (chat.voiceOpen) { voiceCtrl?.closeVoice(); return; }
       if (chat.open) close();
     });
 
@@ -746,18 +528,14 @@
       syncLangButtons();
       if (chat.open) renderChips(chat.chips);
       if (chat.tab === 'concierge') {
-        renderConcierge();
+        conciergeCtrl?.renderConcierge();
         if (el.status) el.status.textContent = t('concierge.status');
       } else if (el.status) {
         el.status.textContent = t('chat.online');
       }
       if (chat.voiceOpen) el.voiceStatus.textContent = t('voice.tap');
-      updateVoiceUI();
+      voiceCtrl?.updateVoiceUI();
     });
-
-    if (synth) {
-      synth.addEventListener?.('voiceschanged', () => { /* voces cargadas en el próximo speak */ });
-    }
 
     window.addEventListener('resize', () => {
       if (!chat.open) return;
@@ -788,15 +566,48 @@
     if (!el.panel || !el.messages) return;
 
     chat.lang = window.SALMAN?.lang || 'es';
+
+    voiceCtrl = S.createVoiceController({
+      chat,
+      el,
+      t,
+      track,
+      addUser,
+      addBot,
+      route
+    });
+
+    conciergeCtrl = S.createConciergeController({
+      chat,
+      el,
+      esc,
+      t,
+      track,
+      WA,
+      closeVoice: () => voiceCtrl.closeVoice(),
+      close
+    });
+
     bind();
     syncLangButtons();
     const restored = restore();
     if (!restored) welcome();
     persist();
+
+    window.Salma = {
+      open,
+      close,
+      toggle,
+      ask,
+      send,
+      setChatTab: conciergeCtrl.setChatTab,
+      renderConcierge: conciergeCtrl.renderConcierge,
+      openArea: conciergeCtrl.openArea,
+      openVIP: conciergeCtrl.openVIP,
+      get isOpen() { return chat.open; }
+    };
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
-
-  window.Salma = { open, close, toggle, ask, send, get isOpen() { return chat.open; } };
 })();
