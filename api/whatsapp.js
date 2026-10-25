@@ -8,13 +8,15 @@
  *   WHATSAPP_TOKEN              token permanente (System User) o temporal
  *   WHATSAPP_PHONE_NUMBER_ID    ID del número (no el número)
  *   WHATSAPP_VERIFY_TOKEN       palabra secreta que tú defines
+ *   WHATSAPP_APP_SECRET         opcional, App Secret de Meta para validar X-Hub-Signature-256
  *   WHATSAPP_API_VERSION        opcional, por defecto v21.0
  *
  * Importante: para la demo usa el número de prueba de Meta y registra como
  * destinatarios los teléfonos del asesor y del equipo (máx. 5). No migres el
- * 324 real a la API sin plan de coexistencia.
+ * +57 315 775 7794 real a la API sin plan de coexistencia.
  */
 
+const crypto = require('crypto');
 const { generateReply } = require('../lib/salman');
 
 const seen = new Map();
@@ -36,6 +38,18 @@ function parseBody(raw) {
     try { return JSON.parse(raw); } catch { return null; }
   }
   return raw;
+}
+
+function verifySignature(req) {
+  const secret = process.env.WHATSAPP_APP_SECRET;
+  if (!secret) return true;
+  const sigHeader = req.headers?.['x-hub-signature-256'];
+  if (!sigHeader || typeof sigHeader !== 'string' || !sigHeader.startsWith('sha256=')) return false;
+  const rawPayload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
+  const expected = `sha256=${crypto.createHmac('sha256', secret).update(rawPayload).digest('hex')}`;
+  const a = Buffer.from(sigHeader);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 function extractText(message) {
@@ -95,6 +109,10 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).send('method_not_allowed');
+  }
+
+  if (!verifySignature(req)) {
+    return res.status(403).send('invalid_signature');
   }
 
   const body = parseBody(req.body);
