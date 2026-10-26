@@ -12,8 +12,7 @@ module.exports = async function handler(req, res) {
   }
 
   const apiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
-  const rawModel = (process.env.GEMINI_MODEL || 'gemini-1.5-flash').trim();
-  const model = /gemini-2\.5/i.test(rawModel) ? 'gemini-1.5-flash' : rawModel;
+  const model = (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
   const isConfigured = Boolean(apiKey);
 
   const data = {
