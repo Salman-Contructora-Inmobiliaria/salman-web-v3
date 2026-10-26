@@ -181,7 +181,7 @@ TEXT.es = {
   'voice.tap': 'Toca el micrófono y habla. Puedes interrumpirme cuando quieras.',
   'voice.speak': 'Hablar',
   'voice.type': 'Escribir',
-  'voice.hint': 'Voz procesada en tu navegador. En producción: STT + LLM + TTS con latencia < 1 s.',
+  'voice.hint': 'Voz del navegador (Web Speech API) + Gemini Flash. Sin costo por minuto; requiere Chrome o Edge y micrófono.',
 
   'lead.kicker': 'Siguiente paso',
   'lead.title': 'Recibe la ficha técnica',

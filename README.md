@@ -1,20 +1,22 @@
-# SALMAN Constructora + Inmobiliaria — Web v2
+# SALMAN Constructora + Inmobiliaria — Web v3
 
 Sitio web comercial bilingüe (ES/EN) para **SALMAN Constructora + Inmobiliaria S.A.S.** (Cartagena de Indias, Colombia). Incluye landing de proyectos residenciales y turísticos, calculadora financiera, captura de leads, asesora digital **Salma** con IA (texto + voz con Web Speech API), pestaña **Concierge** con 5 rutas de derivación a WhatsApp y funciones serverless para Gemini (`/api/chat`) y WhatsApp Cloud API (`/api/whatsapp`).
 
 ## Cómo ejecutar en local
 
-1. **Modo demo estático (Python 3):**
+1. **Modo demo con API local (Node 20+):**
    ```powershell
-   .\start-demo.cmd
+   node scripts/dev-server.js
    ```
-   Abre `http://localhost:8080/` (la voz funciona sobre `localhost` y el chat utiliza automáticamente la base de conocimiento local de respaldo si no hay servidor `/api/chat`).
+   Abre `http://localhost:8080/` y `http://localhost:8080/voz.html`. Sin `GEMINI_API_KEY`, Salma usa la base local y la voz sigue funcionando.
 
 2. **Modo completo con funciones Serverless (Vercel CLI):**
    Copia `.env.example` a `.env.local`, agrega tu `GEMINI_API_KEY` y ejecuta:
    ```powershell
    npx vercel dev
    ```
+
+3. **Voice Lab:** abre `http://localhost:8080/voz.html` para probar micrófono, STT, TTS, API y fallback.
 
 ## Cómo desplegar en Vercel
 
@@ -23,6 +25,12 @@ Sitio web comercial bilingüe (ES/EN) para **SALMAN Constructora + Inmobiliaria 
    - `GEMINI_API_KEY` y `GEMINI_MODEL=gemini-2.5-flash`.
    - `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN` y `WHATSAPP_API_VERSION=v21.0` (para el webhook de Meta).
 3. Despliega y verifica `/`, `/api/chat` y `/api/whatsapp`.
+
+## Voice Lab
+
+- `voz.html` prueba micrófono, reconocimiento de voz, síntesis, `/api/health` y `/api/chat`.
+- `api/health.js` informa si Gemini está configurado sin exponer la clave.
+- `scripts/dev-server.js` sirve el sitio y la API en local.
 
 ## Documentación del proyecto
 

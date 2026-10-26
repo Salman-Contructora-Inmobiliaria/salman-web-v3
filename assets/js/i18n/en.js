@@ -179,7 +179,7 @@ window.TEXT.en = {
   'voice.tap': 'Tap the microphone and speak. You can interrupt me at any time.',
   'voice.speak': 'Speak',
   'voice.type': 'Type',
-  'voice.hint': 'Voice processed in your browser. In producción: STT + LLM + TTS with <1s latency.'.replace('producción', 'production'),
+  'voice.hint': 'Browser voice (Web Speech API) + Gemini Flash. No per-minute cost; requires Chrome or Edge and a microphone.',
 
   'lead.kicker': 'Next step',
   'lead.title': 'Get the technical sheet',

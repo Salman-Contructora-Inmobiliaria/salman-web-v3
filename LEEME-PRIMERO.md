@@ -1,6 +1,6 @@
-﻿# SALMAN web v2 · paquete completo
+﻿# SALMAN web v3 · paquete completo
 
-Esta carpeta es el sitio listo para reemplazar el contenido del repo `salman-web-v2` o subirlo a un repo nuevo.
+Esta carpeta es el sitio organizado por Giselle Ulloa, con el Voice Lab y la API de SALMAN, listo para el repo `salman-web-v3`.
 
 ## Incluye
 
@@ -11,6 +11,9 @@ Esta carpeta es el sitio listo para reemplazar el contenido del repo `salman-web
 - `lib/salman.js`: prompt, reglas y datos verificados.
 - `vercel.json`: redirects `/wa` y `/asesor`, y `noindex` para el dominio de prueba.
 - `.env.example`: variables de entorno de referencia.
+- `voz.html`: laboratorio de voz.
+- `api/health.js`: diagnóstico de Gemini.
+- `scripts/dev-server.js`: servidor local con API.
 - `start-demo.cmd`: servidor local para probar la voz.
 
 ## No incluye

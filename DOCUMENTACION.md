@@ -1,4 +1,4 @@
-# Documentación Técnica y Funcional — SALMAN Web v2
+# Documentación Técnica y Funcional — SALMAN Web v3
 
 - **Proyecto:** SALMAN Constructora + Inmobiliaria S.A.S. (Cartagena de Indias, Colombia)
 - **Dueño del proyecto:** Gerencia SALMAN Constructora + Inmobiliaria S.A.S. (`SalmanSAS.gerencia@gmail.com`)
@@ -21,6 +21,7 @@ El sitio web (`salman-web-v2-completo`) es una **landing comercial bilingüe (ES
 - **Formularios de captura de leads y agendamiento de visitas** conectados a WhatsApp (`+57 315 775 7794`) con consentimiento de Habeas Data (Ley 1581 de 2012).
 - **Salma (Asesora Digital con IA):** chat flotante bilingüe con soporte de voz (Web Speech API: `SpeechRecognition` + `speechSynthesis`), conectado a Google Gemini (`gemini-2.5-flash`) mediante `/api/chat` y con motor local de respaldo (*fallback* por coincidencia de palabras clave sobre `KB`).
 - **Pestaña Concierge:** derivación directa a WhatsApp (`https://wa.me/573157757794`) por área de atención (5 rutas humanas) y validación humana de código VIP.
+- **Voice Lab (`voz.html`):** diagnóstico de micrófono, Web Speech API, `/api/health` y `/api/chat`.
 - **Webhook de WhatsApp Cloud API (`/api/whatsapp`):** integración serverless con Meta Graph API que comparte el cerebro `lib/salman.js`.
 
 > **Advertencia sobre datos del prototipo:** Los nombres de proyectos, precios, áreas, fechas de entrega y porcentajes vendidos en la capa de datos del cliente (`assets/js/data/projects.js` y `assets/js/data/kb.js`) son **contenido ilustrativo de demostración**. En el backend (`lib/salman.js`), el modelo tiene prohibido citar precios, áreas, disponibilidad o condiciones crediticias no verificadas.

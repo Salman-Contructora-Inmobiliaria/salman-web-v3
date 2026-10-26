@@ -5,3 +5,4 @@ DEPLOY.md
 start-demo.cmd
 *.md
 .env*
+scripts/
