@@ -1,0 +1,7 @@
+﻿propuesta/
+README.md
+DEPLOY.md
+start-demo.cmd
+*.md
+.env*
+scripts/
