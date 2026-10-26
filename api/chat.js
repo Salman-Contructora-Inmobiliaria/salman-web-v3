@@ -50,6 +50,10 @@ module.exports = async (req, res) => {
     return res.status(200).json(result);
   } catch (error) {
     console.error('[api/chat]', error.code || error.message, error.detail || '');
-    return res.status(503).json({ error: 'ai_unavailable' });
+    return res.status(503).json({
+      error: 'ai_unavailable',
+      message: error.message,
+      detail: error.detail || null
+    });
   }
 };

@@ -279,7 +279,8 @@
         if (opts.onReply) opts.onReply(data.reply);
         return;
       } catch (error) {
-        chat.apiEnabled = false;
+        // Fallback temporal sin apagar la API permanentemente
+        console.warn('[Salma Chat] Fallback temporal:', error.message);
         setTyping(false);
         track('chat_api_fallback', { reason: String(error.message || error).slice(0, 60) });
       }
