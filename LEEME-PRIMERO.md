@@ -1,6 +1,8 @@
-# SALMAN web v2 · paquete completo
+# SALMAN web v3 · paquete completo
 
-Esta carpeta es el sitio listo para reemplazar el contenido del repo `salman-web-v2` o subirlo a un repo nuevo.
+Esta carpeta es el sitio listo para el repositorio `salman-web-v3` y su despliegue en Vercel.
+
+Repo: https://github.com/Salman-Contructora-Inmobiliaria/salman-web-v3
 
 ## Incluye
 
