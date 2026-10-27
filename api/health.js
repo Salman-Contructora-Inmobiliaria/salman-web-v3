@@ -12,8 +12,8 @@ module.exports = async function handler(req, res) {
   }
 
   const apiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
-  const rawModel = (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
-  const model = /gemini-(3\.5|3\.0)/i.test(rawModel) || !rawModel ? 'gemini-2.5-flash' : rawModel;
+  const rawModel = (process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim();
+  const model = /gemini-(1\.5|2\.0|2\.5)/i.test(rawModel) || !rawModel ? 'gemini-3.8-flash' : rawModel;
   const isConfigured = Boolean(apiKey);
 
   const data = {
@@ -25,35 +25,19 @@ module.exports = async function handler(req, res) {
     timestamp: new Date().toISOString()
   };
 
-  if (req.query && req.query.list === '1' && isConfigured) {
-    try {
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
-      const listData = await resp.json();
-      data.availableModels = (listData.models || []).map(m => m.name.replace('models/', ''));
-    } catch (e) {
-      data.listError = e.message;
-    }
-  }
-
   if (req.query && req.query.test === '1' && isConfigured) {
     try {
-      const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: 'Hola, di Salma lista' }] }]
-          })
-        }
-      );
-      const text = await resp.text();
-      data.directStatus = resp.status;
-      data.directResponse = text;
-      data.geminiWorking = resp.ok;
+      const test = await generateReply({
+        messages: [{ role: 'user', content: 'Di Salma lista' }],
+        lang: 'es',
+        channel: 'web'
+      });
+      data.geminiWorking = true;
+      data.reply = test.reply;
+      data.modelUsed = test.model;
     } catch (err) {
       data.geminiWorking = false;
-      data.error = err.message;
+      data.error = err.detail || err.message;
     }
   }
 
