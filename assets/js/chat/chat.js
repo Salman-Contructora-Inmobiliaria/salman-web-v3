@@ -8,8 +8,11 @@
   const S = (window.SALMAN = window.SALMAN || {});
   const $ = S.$ || ((sel, ctx = document) => ctx.querySelector(sel));
   const esc = S.esc || ((str) => String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])));
-  const WA = S.CONFIG?.waUrl || `https://wa.me/${CONFIG.whatsapp}`;
-  const KB_BY_ID = Object.fromEntries(KB.map((k) => [k.id, k]));
+  const CONFIG = S.CONFIG || window.SALMAN?.CONFIG || (typeof window.CONFIG !== 'undefined' ? window.CONFIG : {});
+  const WA = S.CONFIG?.waUrl || CONFIG.waUrl || `https://wa.me/${CONFIG.whatsapp || '573244286166'}`;
+  const getKB = () => S.KB || window.SALMAN?.KB || (typeof window.KB !== 'undefined' ? window.KB : []);
+  const getPROJECTS = () => S.PROJECTS || window.SALMAN?.PROJECTS || (typeof window.PROJECTS !== 'undefined' ? window.PROJECTS : []);
+  const getKbById = () => Object.fromEntries(getKB().map((k) => [k.id, k]));
 
   const chat = {
     open: false,
@@ -42,7 +45,7 @@
   const t = (key) => window.SALMAN?.t(key) ?? key;
   const tf = (key, vars) => window.SALMAN?.tf(key, vars) ?? key;
   const track = (event, params = {}) => window.SALMAN?.track(event, params);
-  const projectName = (id) => PROJECTS.find((p) => p.id === id)?.name || id;
+  const projectName = (id) => getPROJECTS().find((p) => p.id === id)?.name || id;
 
   /* ------------------------------ mensajes ------------------------------ */
   function format(text) {
@@ -86,7 +89,7 @@
     chat.history.push(message);
     const node = renderMessage(message, opts);
     persist();
-    if (chat.voiceOpen && opts.speak !== false) voiceCtrl?.speak(text);
+    if ((chat.voiceOpen || opts.speak === true) && !chat.muted && opts.speak !== false) voiceCtrl?.speak(text);
     return node;
   }
 
@@ -166,7 +169,7 @@
     let best = null;
     let bestScore = 0;
     let bestWeight = 0;
-    for (const entry of KB) {
+    for (const entry of getKB()) {
       if (entry.id === 'fallback') continue;
       const { score, weight } = scoreEntry(entry, text);
       if (score > bestScore || (score === bestScore && score > 0 && weight > bestWeight)) {
@@ -242,19 +245,20 @@
       });
       return;
     }
-    if (id === 'portfolio' || id === 'projects') return reply(KB_BY_ID.projects, opts);
-    const project = PROJECTS.find((p) => p.id === id);
+    const kbMap = getKbById();
+    if (id === 'portfolio' || id === 'projects') return reply(kbMap.projects, opts);
+    const project = getPROJECTS().find((p) => p.id === id);
     if (project) return projectReply(project, opts);
-    const entry = KB_BY_ID[id];
+    const entry = kbMap[id];
     if (entry) return reply(entry, opts);
-    return reply(KB_BY_ID.fallback, opts);
+    return reply(kbMap.fallback, opts);
   }
 
   async function route(text, opts = {}) {
     const norm = normalize(text);
     if (!norm) return;
     if (/\b(hola|hello|hi|buenas)\b/.test(norm) && chat.history.length <= 1) {
-      return reply(KB_BY_ID.greet, opts);
+      return reply(getKbById().greet, opts);
     }
 
     if (chat.apiEnabled && !opts.local) {

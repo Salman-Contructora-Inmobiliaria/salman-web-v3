@@ -6,7 +6,8 @@
 
   const S = (window.SALMAN = window.SALMAN || {});
   const { $ } = S;
-  const WA = S.CONFIG?.waUrl || `https://wa.me/${CONFIG.whatsapp}`;
+  const CONFIG = S.CONFIG || window.SALMAN?.CONFIG || (typeof window.CONFIG !== "undefined" ? window.CONFIG : {});
+  const WA = S.CONFIG?.waUrl || CONFIG.waUrl || `https://wa.me/${CONFIG.whatsapp || "573244286166"}`;
 
   S.state.lang = S.storage ? S.storage.getLang() : 'es';
 

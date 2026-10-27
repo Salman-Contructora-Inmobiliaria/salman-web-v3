@@ -170,6 +170,9 @@
       utterance.onend = () => {
         chat.speaking = false;
         updateVoiceUI();
+        if (chat.voiceOpen && !chat.listening) {
+          startListening();
+        }
       };
       utterance.onerror = (e) => {
         console.warn('[Salma Voice TTS]', e.error || e);
@@ -343,11 +346,15 @@
 
       chat.voiceOpen = true;
       if (el.voice) el.voice.hidden = false;
-      if (el.voiceStatus) el.voiceStatus.textContent = t('voice.tap') || 'Toca para hablar';
       if (el.voiceTranscript) el.voiceTranscript.textContent = '';
       updateVoiceUI();
 
-      window.setTimeout(startListening, 300);
+      const greeting = chat.lang === 'es'
+        ? 'Hola, soy Salma. ¿En qué te puedo asesorar hoy?'
+        : 'Hi, I am Salma. How can I help you today?';
+
+      if (el.voiceStatus) el.voiceStatus.textContent = greeting;
+      speak(greeting);
     }
 
     function closeVoice() {
