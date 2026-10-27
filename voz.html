@@ -172,17 +172,21 @@
     const prefix = lang === 'es' ? 'es' : 'en';
     const pool = voices.filter(v => (v.lang || '').toLowerCase().startsWith(prefix));
 
+    const maleRegex = /gonzalo|jorge|alvaro|álvaro|carlos|diego|alberto|mateo|manuel|enrique|luis|raul|raúl|fernando|miguel|javier|david|mark|george|male\b/i;
+    const femalePool = pool.filter(v => !maleRegex.test(v.name));
+    const candidates = femalePool.length > 0 ? femalePool : pool;
+
     if (lang === 'es') {
-      const natural = pool.find(v => /natural|neural|online/i.test(v.name) && /salma|colombia|es-co/i.test(v.name + v.lang))
-        || pool.find(v => /natural|neural|online/i.test(v.name) && /dalia|paulina|mónica|monica|camila|female/i.test(v.name))
-        || pool.find(v => /natural|neural|online/i.test(v.name))
-        || pool.find(v => /google/i.test(v.name));
+      const natural = candidates.find(v => /natural|neural|online/i.test(v.name) && /salma|colombia|es-co/i.test(v.name + v.lang))
+        || candidates.find(v => /natural|neural|online/i.test(v.name) && /dalia|paulina|mónica|monica|camila|female/i.test(v.name))
+        || candidates.find(v => /natural|neural|online/i.test(v.name) && !maleRegex.test(v.name))
+        || candidates.find(v => /google/i.test(v.name) && !maleRegex.test(v.name));
       if (natural) return natural;
     }
 
-    return pool.find(v => /google|mónica|monica|paulina|sabina|female/i.test(v.name))
-      || pool.find(v => v.lang.toLowerCase().startsWith(prefix))
-      || pool[0] || null;
+    return candidates.find(v => /google|mónica|monica|paulina|sabina|female/i.test(v.name))
+      || candidates.find(v => !maleRegex.test(v.name))
+      || candidates[0] || null;
   };
 
   const speak = (text) => {

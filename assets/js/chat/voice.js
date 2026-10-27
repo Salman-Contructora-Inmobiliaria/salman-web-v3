@@ -57,28 +57,33 @@
     const langPrefix = isEs ? 'es' : 'en';
     const pool = voices.filter((v) => (v.lang || '').toLowerCase().startsWith(langPrefix));
 
+    const maleRegex = /gonzalo|jorge|alvaro|álvaro|carlos|diego|alberto|mateo|manuel|enrique|luis|raul|raúl|fernando|miguel|javier|david|mark|george|male\b/i;
+    const femalePool = pool.filter((v) => !maleRegex.test(v.name));
+
     if (isEs) {
-      // Nivel 1: Voces Naturales Online de Microsoft / Google (Ej: Microsoft Salma Online Natural es-CO)
-      const naturalSalma = pool.find((v) => /natural|neural|online/i.test(v.name) && /salma|colombia|es-co/i.test(v.name + v.lang));
+      const candidates = femalePool.length > 0 ? femalePool : pool;
+
+      // Nivel 1: Voces Naturales Femeninas Online (Microsoft Salma Online Natural es-CO en Edge o Dalia)
+      const naturalSalma = candidates.find((v) => /natural|neural|online/i.test(v.name) && /salma|colombia|es-co/i.test(v.name + v.lang));
       if (naturalSalma) return naturalSalma;
 
-      const naturalFemaleEs = pool.find((v) =>
+      const naturalFemaleEs = candidates.find((v) =>
         /natural|neural|online/i.test(v.name) &&
         /dalia|paulina|monica|mónica|camila|sofía|female|mujer/i.test(v.name)
       );
       if (naturalFemaleEs) return naturalFemaleEs;
 
-      const anyNaturalEs = pool.find((v) => /natural|neural|online/i.test(v.name));
+      const anyNaturalEs = candidates.find((v) => /natural|neural|online/i.test(v.name) && !maleRegex.test(v.name));
       if (anyNaturalEs) return anyNaturalEs;
 
-      // Nivel 2: Google Speech Services (Motor neural en Android y Chrome)
-      const googleEs = pool.find((v) => /google/i.test(v.name) && /es/i.test(v.lang));
+      // Nivel 2: Google Speech Services Femenino (Motor neural en Android y Chrome)
+      const googleEs = candidates.find((v) => /google/i.test(v.name) && /es/i.test(v.lang) && !maleRegex.test(v.name));
       if (googleEs) return googleEs;
 
-      // Nivel 3: Voces estándar nativas recomendadas (SAPI5 de Windows)
-      const standardEs = pool.find((v) => /sabina|paulina|monica|mónica|helena|female|mujer/i.test(v.name)) ||
-                         pool.find((v) => /es-(co|mx|us)/i.test(v.lang)) ||
-                         pool[0];
+      // Nivel 3: Voces estándar nativas recomendadas femeninas (SAPI5 de Windows: Sabina, Paulina, Helena)
+      const standardEs = candidates.find((v) => /sabina|paulina|monica|mónica|helena|female|mujer/i.test(v.name)) ||
+                         candidates.find((v) => !maleRegex.test(v.name)) ||
+                         candidates[0];
       return standardEs || null;
     }
 
