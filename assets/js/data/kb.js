@@ -132,8 +132,8 @@ const KB = [
   {
     id: 'contact',
     keys: ['contacto', 'telefono', 'teléfono', 'correo', 'email', 'whatsapp', 'llamar', 'contact', 'phone', 'call', 'mail'],
-    es: 'Puedes escribirnos por WhatsApp al +57 315 775 7794, llamar al mismo número o escribir a SalmanSAS.gerencia@gmail.com. Atendemos de lunes a sábado, 8:00 a 18:00 (GMT-5). Si prefieres, te contacto yo con un asesor ahora mismo.',
-    en: 'You can message us on WhatsApp at +57 315 775 7794, call the same number or email SalmanSAS.gerencia@gmail.com. We are available Monday to Saturday, 8am–6pm (GMT-5). If you prefer, I can connect you with an advisor right now.',
+    es: 'Puedes escribirnos por WhatsApp al +57 324 428 6166, llamar al mismo número o escribir a SalmanSAS.gerencia@gmail.com. Atendemos de lunes a sábado, 8:00 a 18:00 (GMT-5). Si prefieres, te contacto yo con un asesor ahora mismo.',
+    en: 'You can message us on WhatsApp at +57 324 428 6166, call the same number or email SalmanSAS.gerencia@gmail.com. We are available Monday to Saturday, 8am–6pm (GMT-5). If you prefer, I can connect you with an advisor right now.',
     chips: ['whatsapp', 'advisor', 'booking']
   },
   {

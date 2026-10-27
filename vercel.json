@@ -3,15 +3,16 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
       ]
     }
   ],
   "redirects": [
-    { "source": "/wa", "destination": "https://wa.me/573157757794", "permanent": false },
+    { "source": "/wa", "destination": "https://wa.me/573244286166", "permanent": false },
     {
       "source": "/asesor",
-      "destination": "https://wa.me/573157757794?text=Hola%20SALMAN%2C%20vengo%20de%20la%20web.%20Quiero%20hablar%20con%20un%20asesor.",
+      "destination": "https://wa.me/573244286166?text=Hola%20SALMAN%2C%20vengo%20de%20la%20web.%20Quiero%20hablar%20con%20un%20asesor.",
       "permanent": false
     }
   ]

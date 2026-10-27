@@ -166,42 +166,79 @@
   };
   const setStatus = (text) => { $('#voiceStatus').textContent = text; };
 
+  let cachedVoices = [];
+  const refreshVoices = () => {
+    if (!synth) return [];
+    const list = synth.getVoices() || [];
+    if (list.length > 0) cachedVoices = list;
+    return cachedVoices;
+  };
+  refreshVoices();
+  if (synth) {
+    if (typeof synth.addEventListener === 'function') synth.addEventListener('voiceschanged', refreshVoices);
+    synth.onvoiceschanged = refreshVoices;
+  }
+
   const pickVoice = () => {
     if (!synth) return null;
-    const voices = synth.getVoices() || [];
+    const voices = refreshVoices();
     const prefix = lang === 'es' ? 'es' : 'en';
     const pool = voices.filter(v => (v.lang || '').toLowerCase().startsWith(prefix));
 
-    const maleRegex = /gonzalo|jorge|alvaro|álvaro|carlos|diego|alberto|mateo|manuel|enrique|luis|raul|raúl|fernando|miguel|javier|david|mark|george|male\b/i;
-    const femalePool = pool.filter(v => !maleRegex.test(v.name));
-    const candidates = femalePool.length > 0 ? femalePool : pool;
+    const femaleRegex = /salma|dalia|paulina|monica|mónica|camila|sofía|sofia|sabina|helena|elena|paloma|laura|elvira|jimena|karina|lucia|lucía|carmen|valeria|female|mujer/i;
+    const maleRegex = /gonzalo|jorge|alvaro|álvaro|carlos|diego|alberto|mateo|manuel|enrique|luis|raul|raúl|fernando|miguel|javier|david|mark|george|alonso|pablo|arnau|ignacio|esteban|tomas|tomás|mario|dario|darío|guillermo|nestor|néstor|gerardo|andres|andrés|emilio|rodrigo|helio|julio|pedro|hector|héctor|male\b|hombre/i;
+
+    const strictlyFemale = pool.filter(v => femaleRegex.test(v.name) && !maleRegex.test(v.name));
+    const nonMalePool = pool.filter(v => !maleRegex.test(v.name));
+    const candidates = strictlyFemale.length > 0 ? strictlyFemale : (nonMalePool.length > 0 ? nonMalePool : pool);
 
     if (lang === 'es') {
-      const natural = candidates.find(v => /natural|neural|online/i.test(v.name) && /salma|colombia|es-co/i.test(v.name + v.lang))
-        || candidates.find(v => /natural|neural|online/i.test(v.name) && /dalia|paulina|mónica|monica|camila|female/i.test(v.name))
-        || candidates.find(v => /natural|neural|online/i.test(v.name) && !maleRegex.test(v.name))
-        || candidates.find(v => /google/i.test(v.name) && !maleRegex.test(v.name));
-      if (natural) return natural;
+      const salmaVoice = candidates.find(v => /salma/i.test(v.name) && /colombia|es-co/i.test(v.name + v.lang))
+        || candidates.find(v => /salma/i.test(v.name));
+      if (salmaVoice) return salmaVoice;
+
+      const naturalFemale = candidates.find(v =>
+        /natural|neural|online/i.test(v.name) &&
+        /dalia|paulina|monica|mónica|camila|sofía|sofia|elena|paloma|jimena|female|mujer/i.test(v.name)
+      );
+      if (naturalFemale) return naturalFemale;
+
+      const googleFemale = candidates.find(v => /google/i.test(v.name) && !maleRegex.test(v.name));
+      if (googleFemale) return googleFemale;
+
+      const standardFemale = candidates.find(v => /sabina|paulina|monica|mónica|helena|elena/i.test(v.name));
+      if (standardFemale) return standardFemale;
+
+      return candidates[0] || null;
     }
 
-    return candidates.find(v => /google|mónica|monica|paulina|sabina|female/i.test(v.name))
-      || candidates.find(v => !maleRegex.test(v.name))
-      || candidates[0] || null;
+    const naturalEnFemale = pool.find(v => /natural|neural|online/i.test(v.name) && /jenny|aria|female|zira/i.test(v.name))
+      || pool.find(v => /zira|female/i.test(v.name))
+      || pool.find(v => !maleRegex.test(v.name))
+      || pool[0];
+    return naturalEnFemale || null;
   };
 
   const speak = (text) => {
     if (!synth) { log(c().noTTS); return; }
-    const clean = String(text).replace(/[•*#]/g,'').replace(/\s+/g,' ').slice(0,700);
-    synth.cancel();
+    if (synth.paused) { try { synth.resume(); } catch (_) {} }
+    const clean = String(text).replace(/[•*#_~`]/g,'').replace(/\s+/g,' ').slice(0,750);
+    try { synth.cancel(); } catch (_) {}
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = lang === 'es' ? 'es-CO' : 'en-US';
-    u.rate = .98; u.pitch = 1;
+    u.rate = 0.98;
+    u.pitch = 1.05;
     const v = pickVoice();
-    if (v) u.voice = v;
+    if (v) {
+      u.voice = v;
+      log('Voz activa: ' + v.name + ' [' + (v.lang || '') + ']');
+    } else {
+      log('Voz activa: Predeterminada del navegador');
+    }
     u.onend = () => log('TTS terminó.');
     u.onerror = (e) => log('TTS error: ' + (e.error || 'desconocido'));
     synth.speak(u);
-    log('TTS: ' + clean.slice(0,80));
+    log('TTS texto: ' + clean.slice(0,80) + '…');
   };
 
   const localReply = () => lang === 'es'

@@ -57,42 +57,47 @@
     const langPrefix = isEs ? 'es' : 'en';
     const pool = voices.filter((v) => (v.lang || '').toLowerCase().startsWith(langPrefix));
 
-    const maleRegex = /gonzalo|jorge|alvaro|álvaro|carlos|diego|alberto|mateo|manuel|enrique|luis|raul|raúl|fernando|miguel|javier|david|mark|george|male\b/i;
-    const femalePool = pool.filter((v) => !maleRegex.test(v.name));
+    const femaleRegex = /salma|dalia|paulina|monica|mónica|camila|sofía|sofia|sabina|helena|elena|paloma|laura|elvira|jimena|karina|lucia|lucía|carmen|valeria|female|mujer/i;
+    const maleRegex = /gonzalo|jorge|alvaro|álvaro|carlos|diego|alberto|mateo|manuel|enrique|luis|raul|raúl|fernando|miguel|javier|david|mark|george|alonso|pablo|arnau|ignacio|esteban|tomas|tomás|mario|dario|darío|guillermo|nestor|néstor|gerardo|andres|andrés|emilio|rodrigo|helio|julio|pedro|hector|héctor|male\b|hombre/i;
+
+    const strictlyFemale = pool.filter((v) => femaleRegex.test(v.name) && !maleRegex.test(v.name));
+    const nonMalePool = pool.filter((v) => !maleRegex.test(v.name));
+    const candidates = strictlyFemale.length > 0 ? strictlyFemale : (nonMalePool.length > 0 ? nonMalePool : pool);
 
     if (isEs) {
-      const candidates = femalePool.length > 0 ? femalePool : pool;
+      // Prioridad 1: Microsoft Salma Online (Natural) - Spanish (Colombia)
+      const salmaVoice = candidates.find((v) => /salma/i.test(v.name) && /colombia|es-co/i.test(v.name + v.lang));
+      if (salmaVoice) return salmaVoice;
 
-      // Nivel 1: Voces Naturales Femeninas Online (Microsoft Salma Online Natural es-CO en Edge o Dalia)
-      const naturalSalma = candidates.find((v) => /natural|neural|online/i.test(v.name) && /salma|colombia|es-co/i.test(v.name + v.lang));
-      if (naturalSalma) return naturalSalma;
+      const anySalma = candidates.find((v) => /salma/i.test(v.name));
+      if (anySalma) return anySalma;
 
-      const naturalFemaleEs = candidates.find((v) =>
+      // Prioridad 2: Voces Naturales / Neurales Femeninas (Dalia, Paulina, Camila, Mónica, Sofía)
+      const naturalFemale = candidates.find((v) =>
         /natural|neural|online/i.test(v.name) &&
-        /dalia|paulina|monica|mónica|camila|sofía|female|mujer/i.test(v.name)
+        /dalia|paulina|monica|mónica|camila|sofía|sofia|elena|paloma|jimena|female|mujer/i.test(v.name)
       );
-      if (naturalFemaleEs) return naturalFemaleEs;
+      if (naturalFemale) return naturalFemale;
 
-      const anyNaturalEs = candidates.find((v) => /natural|neural|online/i.test(v.name) && !maleRegex.test(v.name));
-      if (anyNaturalEs) return anyNaturalEs;
+      // Prioridad 3: Google español neural (Android / Chrome Desktop)
+      const googleFemale = candidates.find((v) => /google/i.test(v.name) && !maleRegex.test(v.name));
+      if (googleFemale) return googleFemale;
 
-      // Nivel 2: Google Speech Services Femenino (Motor neural en Android y Chrome)
-      const googleEs = candidates.find((v) => /google/i.test(v.name) && /es/i.test(v.lang) && !maleRegex.test(v.name));
-      if (googleEs) return googleEs;
+      // Prioridad 4: Sabina Desktop (Windows 10/11 offline nativa femenina) u otras estándar femeninas
+      const standardFemale = candidates.find((v) => /sabina|paulina|monica|mónica|helena|elena/i.test(v.name));
+      if (standardFemale) return standardFemale;
 
-      // Nivel 3: Voces estándar nativas recomendadas femeninas (SAPI5 de Windows: Sabina, Paulina, Helena)
-      const standardEs = candidates.find((v) => /sabina|paulina|monica|mónica|helena|female|mujer/i.test(v.name)) ||
-                         candidates.find((v) => !maleRegex.test(v.name)) ||
-                         candidates[0];
-      return standardEs || null;
+      // Fallback dentro del conjunto femenino o no-masculino
+      return candidates[0] || null;
     }
 
     // Para inglés (en):
-    const naturalEn = pool.find((v) => /natural|neural|online/i.test(v.name) && /jenny|aria|female/i.test(v.name)) ||
-                     pool.find((v) => /natural|neural|online/i.test(v.name)) ||
-                     pool.find((v) => /google/i.test(v.name)) ||
-                     pool[0];
-    return naturalEn || null;
+    const naturalEnFemale = pool.find((v) => /natural|neural|online/i.test(v.name) && /jenny|aria|female|zira/i.test(v.name)) ||
+                           pool.find((v) => /zira|female/i.test(v.name)) ||
+                           pool.find((v) => /natural|neural|online/i.test(v.name) && !maleRegex.test(v.name)) ||
+                           pool.find((v) => !maleRegex.test(v.name)) ||
+                           pool[0];
+    return naturalEnFemale || null;
   }
 
   /* --------------------------------------------------------------------------
@@ -151,12 +156,13 @@
       const voice = selectBestVoice(chat.lang);
       if (voice) {
         utterance.voice = voice;
+        console.log('[Salma Voice] Voz seleccionada:', voice.name, '| lang:', voice.lang);
       }
 
       const meta = getLangMeta(chat.lang);
       utterance.lang = meta.tts || (chat.lang === 'es' ? 'es-CO' : 'en-US');
-      utterance.rate = 1.0;
-      utterance.pitch = 1.02;
+      utterance.rate = 0.98;
+      utterance.pitch = 1.05;
 
       chat.speaking = true;
       updateVoiceUI();
