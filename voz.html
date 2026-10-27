@@ -219,12 +219,19 @@
     return naturalEnFemale || null;
   };
 
+  let labUtterance = null;
   const speak = (text) => {
     if (!synth) { log(c().noTTS); return; }
     if (synth.paused) { try { synth.resume(); } catch (_) {} }
     const clean = String(text).replace(/[•*#_~`]/g,'').replace(/\s+/g,' ').slice(0,750);
+    if (labUtterance) {
+      labUtterance.onend = null;
+      labUtterance.onerror = null;
+    }
     try { synth.cancel(); } catch (_) {}
     const u = new SpeechSynthesisUtterance(clean);
+    labUtterance = u;
+    window._salmaLabUtterance = u;
     u.lang = lang === 'es' ? 'es-CO' : 'en-US';
     u.rate = 0.98;
     u.pitch = 1.05;
@@ -235,10 +242,25 @@
     } else {
       log('Voz activa: Predeterminada del navegador');
     }
-    u.onend = () => log('TTS terminó.');
-    u.onerror = (e) => log('TTS error: ' + (e.error || 'desconocido'));
-    synth.speak(u);
-    log('TTS texto: ' + clean.slice(0,80) + '…');
+    u.onend = () => {
+      labUtterance = null;
+      window._salmaLabUtterance = null;
+      log('TTS terminó.');
+    };
+    u.onerror = (e) => {
+      labUtterance = null;
+      window._salmaLabUtterance = null;
+      log('TTS error: ' + (e.error || 'desconocido'));
+    };
+    setTimeout(() => {
+      try {
+        if (synth.paused) synth.resume();
+        synth.speak(u);
+        log('TTS texto: ' + clean.slice(0,80) + '…');
+      } catch (err) {
+        log('TTS speak error: ' + err.message);
+      }
+    }, 60);
   };
 
   const localReply = () => lang === 'es'
@@ -280,10 +302,22 @@
   };
 
   const startMic = async () => {
+    if (navigator.permissions && navigator.permissions.query) {
+      try {
+        const perm = await navigator.permissions.query({ name: 'microphone' });
+        if (perm.state === 'denied') {
+          setStatus(c().denied);
+          log('Permiso de micrófono previamente denegado en navegador.');
+          return;
+        }
+      } catch (_) {}
+    }
+
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach((track) => track.stop());
+        await new Promise((r) => setTimeout(r, 140));
       } catch (err) {
         setStatus(c().denied);
         log('Permiso de microfono bloqueado en navegador: ' + err.message);

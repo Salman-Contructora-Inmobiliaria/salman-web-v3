@@ -24,13 +24,16 @@
      1. Precarga Asíncrona y Cache de Voces Naturales (Desktop & Mobile)
      -------------------------------------------------------------------------- */
   let cachedVoices = [];
+  let activeUtterance = null; // Previene Garbage Collection prematuro en Chromium Desktop (Chrome/Edge)
 
   function refreshVoices() {
     if (!synth) return [];
-    const list = synth.getVoices() || [];
-    if (list.length > 0) {
-      cachedVoices = list;
-    }
+    try {
+      const list = synth.getVoices() || [];
+      if (list.length > 0) {
+        cachedVoices = list;
+      }
+    } catch (_) {}
     return cachedVoices;
   }
 
@@ -50,23 +53,27 @@
    * Descarte: Voces en inglés o sintéticas robóticas si el idioma es español.
    */
   function selectBestVoice(targetLang = 'es') {
-    const voices = refreshVoices();
+    let voices = refreshVoices();
+    if (!voices.length && synth) {
+      try { voices = synth.getVoices() || []; } catch (_) {}
+    }
     if (!voices.length) return null;
 
     const isEs = targetLang.toLowerCase().startsWith('es');
     const langPrefix = isEs ? 'es' : 'en';
     const pool = voices.filter((v) => (v.lang || '').toLowerCase().startsWith(langPrefix));
+    const effectivePool = pool.length > 0 ? pool : voices;
 
     const femaleRegex = /salma|dalia|paulina|monica|mónica|camila|sofía|sofia|sabina|helena|elena|paloma|laura|elvira|jimena|karina|lucia|lucía|carmen|valeria|female|mujer/i;
     const maleRegex = /gonzalo|jorge|alvaro|álvaro|carlos|diego|alberto|mateo|manuel|enrique|luis|raul|raúl|fernando|miguel|javier|david|mark|george|alonso|pablo|arnau|ignacio|esteban|tomas|tomás|mario|dario|darío|guillermo|nestor|néstor|gerardo|andres|andrés|emilio|rodrigo|helio|julio|pedro|hector|héctor|male\b|hombre/i;
 
-    const strictlyFemale = pool.filter((v) => femaleRegex.test(v.name) && !maleRegex.test(v.name));
-    const nonMalePool = pool.filter((v) => !maleRegex.test(v.name));
-    const candidates = strictlyFemale.length > 0 ? strictlyFemale : (nonMalePool.length > 0 ? nonMalePool : pool);
+    const strictlyFemale = effectivePool.filter((v) => femaleRegex.test(v.name) && !maleRegex.test(v.name));
+    const nonMalePool = effectivePool.filter((v) => !maleRegex.test(v.name));
+    const candidates = strictlyFemale.length > 0 ? strictlyFemale : (nonMalePool.length > 0 ? nonMalePool : effectivePool);
 
     if (isEs) {
       // Prioridad 1: Microsoft Salma Online (Natural) - Spanish (Colombia)
-      const salmaVoice = candidates.find((v) => /salma/i.test(v.name) && /colombia|es-co/i.test(v.name + v.lang));
+      const salmaVoice = candidates.find((v) => /salma/i.test(v.name) && /colombia|es-co/i.test(v.name + (v.lang || '')));
       if (salmaVoice) return salmaVoice;
 
       const anySalma = candidates.find((v) => /salma/i.test(v.name));
@@ -87,8 +94,8 @@
       const standardFemale = candidates.find((v) => /sabina|paulina|monica|mónica|helena|elena/i.test(v.name));
       if (standardFemale) return standardFemale;
 
-      // Fallback dentro del conjunto femenino o no-masculino
-      return candidates[0] || null;
+      // Fallback dentro del conjunto femenino, pool o cualquier voz disponible
+      return candidates[0] || pool[0] || voices[0] || null;
     }
 
     // Para inglés (en):
@@ -96,7 +103,8 @@
                            pool.find((v) => /zira|female/i.test(v.name)) ||
                            pool.find((v) => /natural|neural|online/i.test(v.name) && !maleRegex.test(v.name)) ||
                            pool.find((v) => !maleRegex.test(v.name)) ||
-                           pool[0];
+                           pool[0] ||
+                           voices[0];
     return naturalEnFemale || null;
   }
 
@@ -104,9 +112,12 @@
      2. Desbloqueo de AudioContext & Autoplay Policy en Chromium Desktop
      -------------------------------------------------------------------------- */
   function unlockAudioPolicy() {
-    if (synth && synth.paused) {
-      try { synth.resume(); } catch (_) {}
-    }
+    if (!synth) return;
+    try {
+      if (synth.paused) {
+        synth.resume();
+      }
+    } catch (_) {}
   }
 
   /* --------------------------------------------------------------------------
@@ -148,11 +159,21 @@
         .replace(/\s+/g, ' ')
         .slice(0, 800);
 
+      // Desvincular handlers anteriores para evitar fugas de memoria y llamadas huérfanas
+      if (activeUtterance) {
+        activeUtterance.onend = null;
+        activeUtterance.onerror = null;
+      }
+
       try {
         synth.cancel();
       } catch (_) {}
 
       const utterance = new SpeechSynthesisUtterance(clean);
+      // Retener referencia viva para prevenir Garbage Collection en Chrome Desktop
+      activeUtterance = utterance;
+      window._salmaActiveUtterance = utterance;
+
       const voice = selectBestVoice(chat.lang);
       if (voice) {
         utterance.voice = voice;
@@ -168,22 +189,38 @@
       updateVoiceUI();
 
       utterance.onend = () => {
+        activeUtterance = null;
+        window._salmaActiveUtterance = null;
         chat.speaking = false;
         updateVoiceUI();
-        if (chat.voiceOpen && !chat.listening) {
-          startListening();
-        }
       };
       utterance.onerror = (e) => {
+        activeUtterance = null;
+        window._salmaActiveUtterance = null;
         console.warn('[Salma Voice TTS]', e.error || e);
         chat.speaking = false;
         updateVoiceUI();
       };
 
-      synth.speak(utterance);
+      // En Chromium Desktop (Windows/Mac), synth.cancel() procesa de forma asíncrona.
+      // Un pequeño retraso de 60ms asegura que el motor de audio esté desbloqueado.
+      setTimeout(() => {
+        try {
+          if (synth.paused) synth.resume();
+          synth.speak(utterance);
+        } catch (speakErr) {
+          console.warn('[Salma Voice speak error]', speakErr);
+        }
+      }, 60);
     }
 
     function stopSpeech() {
+      if (activeUtterance) {
+        activeUtterance.onend = null;
+        activeUtterance.onerror = null;
+        activeUtterance = null;
+        window._salmaActiveUtterance = null;
+      }
       if (synth) {
         try { synth.cancel(); } catch (_) {}
       }
@@ -196,11 +233,22 @@
      * el reconocimiento, evitando que Chromium aborte con "not-allowed" en frío.
      */
     async function requestHardwareMic() {
+      // 1. Si la API de permisos ya lo tiene concedido, no interrumpir el canal de audio
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const perm = await navigator.permissions.query({ name: 'microphone' });
+          if (perm.state === 'granted') return true;
+          if (perm.state === 'denied') return false;
+        } catch (_) {}
+      }
+
+      // 2. Si no, verificar mediante getUserMedia con liberación controlada
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          // Liberar inmediatamente el canal para que SpeechRecognition tenga uso exclusivo del micrófono
           stream.getTracks().forEach((track) => track.stop());
+          // Pausa esencial para que el subsistema WASAPI/DirectSound de Windows libere el canal antes de que SpeechRecognition lo tome
+          await new Promise((r) => setTimeout(r, 140));
           return true;
         } catch (permErr) {
           console.warn('[Salma Voice] Permiso de micrófono no concedido en hardware/navegador:', permErr);
