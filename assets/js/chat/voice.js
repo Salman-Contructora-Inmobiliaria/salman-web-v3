@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    SALMAN — Reconocimiento y síntesis de voz de Salma (chat/voice.js)
    Web Speech API (SpeechRecognition + speechSynthesis) en ES/EN.
    ========================================================================== */
@@ -8,6 +8,12 @@
   const S = (window.SALMAN = window.SALMAN || {});
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const synth = window.speechSynthesis || null;
+
+  const LANG_FALLBACK = {
+    es: { speech: 'es-CO', tts: 'es-CO' },
+    en: { speech: 'en-US', tts: 'en-US' }
+  };
+  const getLangMeta = (lang) => (S.LANG_META && S.LANG_META[lang]) || (window.LANG_META && window.LANG_META[lang]) || LANG_FALLBACK[lang] || LANG_FALLBACK.es;
 
   function createVoiceController(ctx) {
     const { chat, el, t, track, addUser, addBot, route } = ctx;
@@ -44,7 +50,7 @@
       const utterance = new SpeechSynthesisUtterance(clean);
       const voice = pickVoice();
       if (voice) utterance.voice = voice;
-      utterance.lang = LANG_META[chat.lang].tts;
+      utterance.lang = getLangMeta(chat.lang).tts;
       utterance.rate = 0.98;
       utterance.pitch = 1;
       chat.speaking = true;
@@ -60,7 +66,19 @@
       updateVoiceUI();
     }
 
-    function startListening() {
+    async function startListening() {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((track) => track.stop());
+        } catch (permErr) {
+          console.warn('[Salma Voice] Permiso de microfono bloqueado:', permErr);
+          chat.listening = false;
+          updateVoiceUI();
+          if (el.voiceStatus) el.voiceStatus.textContent = t('chat.micDenied');
+          return;
+        }
+      }
       if (!SR) {
         addBot(t('chat.voiceUnsupported'), { speak: false, chips: ['advisor', 'projects'] });
         return;
@@ -72,7 +90,7 @@
       try {
         const recognition = new SR();
         chat.recognition = recognition;
-        recognition.lang = LANG_META[chat.lang].speech;
+        recognition.lang = getLangMeta(chat.lang).speech;
         recognition.interimResults = true;
         recognition.continuous = false;
         recognition.maxAlternatives = 1;
@@ -183,3 +201,4 @@
 
   S.createVoiceController = createVoiceController;
 })();
+

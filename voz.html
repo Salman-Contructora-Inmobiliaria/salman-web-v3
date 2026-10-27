@@ -228,7 +228,17 @@
     if (!fromVoice) log('Texto enviado: ' + text.slice(0,80));
   };
 
-  const startMic = () => {
+  const startMic = async () => {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+      } catch (err) {
+        setStatus(c().denied);
+        log('Permiso de microfono bloqueado en navegador: ' + err.message);
+        return;
+      }
+    }
     if (!SR) { setStatus(c().unsupported); log('SpeechRecognition no disponible.'); return; }
     if (listening) return;
     if (synth) synth.cancel();
@@ -324,5 +334,6 @@
 </script>
 </body>
 </html>
+
 
 
