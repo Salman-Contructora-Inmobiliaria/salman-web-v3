@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -168,11 +168,21 @@
 
   const pickVoice = () => {
     if (!synth) return null;
-    const voices = synth.getVoices();
+    const voices = synth.getVoices() || [];
     const prefix = lang === 'es' ? 'es' : 'en';
-    return voices.find(v => v.lang.toLowerCase().startsWith(prefix) && /google|mónica|monica|paulina|helena|sabina|female/i.test(v.name))
-      || voices.find(v => v.lang.toLowerCase().startsWith(prefix))
-      || voices[0] || null;
+    const pool = voices.filter(v => (v.lang || '').toLowerCase().startsWith(prefix));
+
+    if (lang === 'es') {
+      const natural = pool.find(v => /natural|neural|online/i.test(v.name) && /salma|colombia|es-co/i.test(v.name + v.lang))
+        || pool.find(v => /natural|neural|online/i.test(v.name) && /dalia|paulina|mónica|monica|camila|female/i.test(v.name))
+        || pool.find(v => /natural|neural|online/i.test(v.name))
+        || pool.find(v => /google/i.test(v.name));
+      if (natural) return natural;
+    }
+
+    return pool.find(v => /google|mónica|monica|paulina|sabina|female/i.test(v.name))
+      || pool.find(v => v.lang.toLowerCase().startsWith(prefix))
+      || pool[0] || null;
   };
 
   const speak = (text) => {

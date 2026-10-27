@@ -1,6 +1,7 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    SALMAN — Reconocimiento y síntesis de voz de Salma (chat/voice.js)
-   Web Speech API (SpeechRecognition + speechSynthesis) en ES/EN.
+   Solución de alta fidelidad con paridad completa Desktop (Windows/Mac) y Mobile.
+   Web Speech API (SpeechRecognition + SpeechSynthesis Neural / Natural).
    ========================================================================== */
 (() => {
   'use strict';
@@ -13,149 +14,309 @@
     es: { speech: 'es-CO', tts: 'es-CO' },
     en: { speech: 'en-US', tts: 'en-US' }
   };
-  const getLangMeta = (lang) => (S.LANG_META && S.LANG_META[lang]) || (window.LANG_META && window.LANG_META[lang]) || LANG_FALLBACK[lang] || LANG_FALLBACK.es;
+  const getLangMeta = (lang) =>
+    (S.LANG_META && S.LANG_META[lang]) ||
+    (window.LANG_META && window.LANG_META[lang]) ||
+    LANG_FALLBACK[lang] ||
+    LANG_FALLBACK.es;
 
+  /* --------------------------------------------------------------------------
+     1. Precarga Asíncrona y Cache de Voces Naturales (Desktop & Mobile)
+     -------------------------------------------------------------------------- */
+  let cachedVoices = [];
+
+  function refreshVoices() {
+    if (!synth) return [];
+    const list = synth.getVoices() || [];
+    if (list.length > 0) {
+      cachedVoices = list;
+    }
+    return cachedVoices;
+  }
+
+  refreshVoices();
+  if (synth) {
+    if (typeof synth.addEventListener === 'function') {
+      synth.addEventListener('voiceschanged', refreshVoices);
+    }
+    synth.onvoiceschanged = refreshVoices;
+  }
+
+  /**
+   * Selector prioritario de voces neurales y naturales de alta calidad.
+   * Prioridad 1: Voces Online / Naturales / Neurales (Edge Natural / Google Cloud).
+   * Prioridad 2: Voces Google nativas (Android/Chrome).
+   * Prioridad 3: Voces femeninas estándar en español (Sabina, Paulina, Dalia).
+   * Descarte: Voces en inglés o sintéticas robóticas si el idioma es español.
+   */
+  function selectBestVoice(targetLang = 'es') {
+    const voices = refreshVoices();
+    if (!voices.length) return null;
+
+    const isEs = targetLang.toLowerCase().startsWith('es');
+    const langPrefix = isEs ? 'es' : 'en';
+    const pool = voices.filter((v) => (v.lang || '').toLowerCase().startsWith(langPrefix));
+
+    if (isEs) {
+      // Nivel 1: Voces Naturales Online de Microsoft / Google (Ej: Microsoft Salma Online Natural es-CO)
+      const naturalSalma = pool.find((v) => /natural|neural|online/i.test(v.name) && /salma|colombia|es-co/i.test(v.name + v.lang));
+      if (naturalSalma) return naturalSalma;
+
+      const naturalFemaleEs = pool.find((v) =>
+        /natural|neural|online/i.test(v.name) &&
+        /dalia|paulina|monica|mónica|camila|sofía|female|mujer/i.test(v.name)
+      );
+      if (naturalFemaleEs) return naturalFemaleEs;
+
+      const anyNaturalEs = pool.find((v) => /natural|neural|online/i.test(v.name));
+      if (anyNaturalEs) return anyNaturalEs;
+
+      // Nivel 2: Google Speech Services (Motor neural en Android y Chrome)
+      const googleEs = pool.find((v) => /google/i.test(v.name) && /es/i.test(v.lang));
+      if (googleEs) return googleEs;
+
+      // Nivel 3: Voces estándar nativas recomendadas (SAPI5 de Windows)
+      const standardEs = pool.find((v) => /sabina|paulina|monica|mónica|helena|female|mujer/i.test(v.name)) ||
+                         pool.find((v) => /es-(co|mx|us)/i.test(v.lang)) ||
+                         pool[0];
+      return standardEs || null;
+    }
+
+    // Para inglés (en):
+    const naturalEn = pool.find((v) => /natural|neural|online/i.test(v.name) && /jenny|aria|female/i.test(v.name)) ||
+                     pool.find((v) => /natural|neural|online/i.test(v.name)) ||
+                     pool.find((v) => /google/i.test(v.name)) ||
+                     pool[0];
+    return naturalEn || null;
+  }
+
+  /* --------------------------------------------------------------------------
+     2. Desbloqueo de AudioContext & Autoplay Policy en Chromium Desktop
+     -------------------------------------------------------------------------- */
+  function unlockAudioPolicy() {
+    if (synth && synth.paused) {
+      try { synth.resume(); } catch (_) {}
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     3. Controlador Principal de Voz de Salma
+     -------------------------------------------------------------------------- */
   function createVoiceController(ctx) {
     const { chat, el, t, track, addUser, addBot, route } = ctx;
-
-    function pickVoice() {
-      if (!synth) return null;
-      const voices = synth.getVoices();
-      const lang = chat.lang === 'es' ? 'es' : 'en';
-      const pool = voices.filter((v) => v.lang.toLowerCase().startsWith(lang));
-      const preferred = pool.find((v) => /google|mónica|monica|paulina|helena|sabina|female|mujer/i.test(v.name))
-        || pool.find((v) => /es-(co|mx|us)|en-us/i.test(v.lang))
-        || pool[0];
-      return preferred || null;
-    }
 
     function updateVoiceUI() {
       if (!el.voice) return;
       el.voice.hidden = !chat.voiceOpen;
       el.orb?.classList.toggle('is-listening', chat.listening);
       el.orb?.classList.toggle('is-speaking', chat.speaking);
+
       if (!chat.voiceOpen) return;
-      if (chat.listening) el.voiceStatus.textContent = t('chat.listening');
-      else if (chat.speaking) el.voiceStatus.textContent = t('chat.speaking');
-      else if (!el.voiceStatus.textContent.trim()) el.voiceStatus.textContent = t('voice.tap');
+
+      if (chat.listening) {
+        el.voiceStatus.textContent = t('chat.listening') || 'Escuchando…';
+      } else if (chat.speaking) {
+        el.voiceStatus.textContent = t('chat.speaking') || 'Salma está hablando…';
+      } else if (!el.voiceStatus.textContent.trim()) {
+        el.voiceStatus.textContent = t('voice.tap') || 'Toca para hablar';
+      }
+
       if (el.voiceListen) {
-        el.voiceListen.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#${chat.listening ? 'i-pause' : 'i-mic'}"></use></svg><span>${chat.listening ? (chat.lang === 'es' ? 'Detener' : 'Stop') : t('voice.speak')}</span>`;
+        el.voiceListen.innerHTML = `
+          <svg class="icon" aria-hidden="true"><use href="#${chat.listening ? 'i-pause' : 'i-mic'}"></use></svg>
+          <span>${chat.listening ? (chat.lang === 'es' ? 'Detener' : 'Stop') : (t('voice.speak') || 'Hablar con Salma')}</span>
+        `;
       }
     }
 
     function speak(text) {
       if (!synth || chat.muted) return;
-      const clean = String(text).replace(/[•*#]/g, '').replace(/\s+/g, ' ').slice(0, 700);
-      synth.cancel();
+      unlockAudioPolicy();
+
+      const clean = String(text)
+        .replace(/[•*#_~`]/g, '')
+        .replace(/\s+/g, ' ')
+        .slice(0, 800);
+
+      try {
+        synth.cancel();
+      } catch (_) {}
+
       const utterance = new SpeechSynthesisUtterance(clean);
-      const voice = pickVoice();
-      if (voice) utterance.voice = voice;
-      utterance.lang = getLangMeta(chat.lang).tts;
-      utterance.rate = 0.98;
-      utterance.pitch = 1;
+      const voice = selectBestVoice(chat.lang);
+      if (voice) {
+        utterance.voice = voice;
+      }
+
+      const meta = getLangMeta(chat.lang);
+      utterance.lang = meta.tts || (chat.lang === 'es' ? 'es-CO' : 'en-US');
+      utterance.rate = 1.0;
+      utterance.pitch = 1.02;
+
       chat.speaking = true;
       updateVoiceUI();
-      utterance.onend = () => { chat.speaking = false; updateVoiceUI(); };
-      utterance.onerror = () => { chat.speaking = false; updateVoiceUI(); };
+
+      utterance.onend = () => {
+        chat.speaking = false;
+        updateVoiceUI();
+      };
+      utterance.onerror = (e) => {
+        console.warn('[Salma Voice TTS]', e.error || e);
+        chat.speaking = false;
+        updateVoiceUI();
+      };
+
       synth.speak(utterance);
     }
 
     function stopSpeech() {
-      if (synth) synth.cancel();
+      if (synth) {
+        try { synth.cancel(); } catch (_) {}
+      }
       chat.speaking = false;
       updateVoiceUI();
     }
 
-    async function startListening() {
+    /**
+     * Asegura la concesión de permisos de micrófono en Windows/Mac antes de iniciar
+     * el reconocimiento, evitando que Chromium aborte con "not-allowed" en frío.
+     */
+    async function requestHardwareMic() {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // Liberar inmediatamente el canal para que SpeechRecognition tenga uso exclusivo del micrófono
           stream.getTracks().forEach((track) => track.stop());
+          return true;
         } catch (permErr) {
-          console.warn('[Salma Voice] Permiso de microfono bloqueado:', permErr);
-          chat.listening = false;
-          updateVoiceUI();
-          if (el.voiceStatus) el.voiceStatus.textContent = t('chat.micDenied');
-          return;
+          console.warn('[Salma Voice] Permiso de micrófono no concedido en hardware/navegador:', permErr);
+          return false;
         }
       }
+      return true;
+    }
+
+    async function startListening() {
       if (!SR) {
         addBot(t('chat.voiceUnsupported'), { speak: false, chips: ['advisor', 'projects'] });
         return;
       }
+
       if (chat.listening || !chat.voiceOpen) return;
       stopSpeech();
+      unlockAudioPolicy();
+
       chat.voiceFinal = '';
-      el.voiceTranscript.textContent = '';
+      if (el.voiceTranscript) el.voiceTranscript.textContent = '';
+
+      // Verificar y forzar el popup de permiso en Chromium Desktop
+      const micGranted = await requestHardwareMic();
+      if (!micGranted) {
+        chat.listening = false;
+        updateVoiceUI();
+        if (el.voiceStatus) {
+          el.voiceStatus.textContent = t('chat.micDenied') || 'Permiso de micrófono denegado. Revisa el candado en tu navegador.';
+        }
+        return;
+      }
+
       try {
         const recognition = new SR();
         chat.recognition = recognition;
-        recognition.lang = getLangMeta(chat.lang).speech;
+        const meta = getLangMeta(chat.lang);
+        recognition.lang = meta.speech || (chat.lang === 'es' ? 'es-CO' : 'en-US');
         recognition.interimResults = true;
         recognition.continuous = false;
         recognition.maxAlternatives = 1;
 
         recognition.onstart = () => {
           chat.listening = true;
-          el.voiceStatus.textContent = t('chat.listening');
+          if (el.voiceStatus) el.voiceStatus.textContent = t('chat.listening') || 'Escuchando…';
           updateVoiceUI();
         };
+
         recognition.onresult = (event) => {
           let interim = '';
           for (let i = event.resultIndex; i < event.results.length; i += 1) {
             const result = event.results[i];
-            if (result.isFinal) chat.voiceFinal += `${result[0].transcript} `;
-            else interim += result[0].transcript;
+            if (result.isFinal) {
+              chat.voiceFinal += `${result[0].transcript} `;
+            } else {
+              interim += result[0].transcript;
+            }
           }
-          el.voiceTranscript.textContent = (chat.voiceFinal + interim).trim();
+          if (el.voiceTranscript) {
+            el.voiceTranscript.textContent = (chat.voiceFinal + interim).trim();
+          }
         };
+
         recognition.onerror = (event) => {
           chat.listening = false;
           updateVoiceUI();
-          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            el.voiceStatus.textContent = t('chat.micDenied');
-            track('chat_voice_error', { error: event.error });
-          } else if (event.error === 'network') {
-            el.voiceStatus.textContent = chat.lang === 'es'
-              ? 'El navegador no pudo conectar el servicio de voz. Si abriste el archivo localmente, usa el servidor de demo (HTTPS o localhost).'
-              : 'The browser could not reach the speech service. If you opened the file locally, use the demo server (HTTPS or localhost).';
-            track('chat_voice_error', { error: event.error });
+
+          const errCode = event.error || 'unknown';
+          console.warn('[Salma Voice STT Error]:', errCode);
+
+          if (errCode === 'not-allowed' || errCode === 'service-not-allowed') {
+            if (el.voiceStatus) el.voiceStatus.textContent = t('chat.micDenied');
+            track('chat_voice_error', { error: errCode });
+          } else if (errCode === 'network') {
+            if (el.voiceStatus) {
+              el.voiceStatus.textContent = chat.lang === 'es'
+                ? 'Conexión con el servicio de voz interrumpida. Intenta nuevamente.'
+                : 'Speech service connection interrupted. Please try again.';
+            }
+            track('chat_voice_error', { error: errCode });
+          } else if (errCode === 'no-speech') {
+            if (el.voiceStatus) {
+              el.voiceStatus.textContent = chat.lang === 'es'
+                ? 'No escuché tu voz. Haz clic para intentar de nuevo.'
+                : 'I did not catch that. Click to try again.';
+            }
           }
         };
+
         recognition.onend = () => {
           chat.listening = false;
           updateVoiceUI();
           if (!chat.voiceOpen) return;
-          const text = chat.voiceFinal.trim();
+
+          const text = (chat.voiceFinal || '').trim();
           if (text) {
             addUser(text);
-            el.voiceStatus.textContent = t('chat.thinking');
+            if (el.voiceStatus) el.voiceStatus.textContent = t('chat.thinking') || 'Pensando…';
+
             route(text, {
               speak: true,
               fast: true,
               onReply: (replyText) => {
-                if (chat.voiceOpen) {
-                  el.voiceStatus.textContent = replyText.replace(/\s+/g, ' ').slice(0, 220) + (replyText.length > 220 ? '…' : '');
-                  el.voiceTranscript.textContent = text;
+                if (chat.voiceOpen && el.voiceStatus) {
+                  el.voiceStatus.textContent =
+                    replyText.replace(/\s+/g, ' ').slice(0, 220) + (replyText.length > 220 ? '…' : '');
+                  if (el.voiceTranscript) el.voiceTranscript.textContent = text;
                 }
               }
             });
           } else {
-            el.voiceStatus.textContent = t('voice.tap');
+            if (el.voiceStatus && !el.voiceStatus.textContent.includes('No escuché')) {
+              el.voiceStatus.textContent = t('voice.tap') || 'Toca para hablar';
+            }
           }
         };
+
         recognition.start();
         track('chat_voice_start');
       } catch (err) {
+        console.error('[Salma Voice Start Error]:', err);
         chat.listening = false;
         updateVoiceUI();
-        el.voiceStatus.textContent = t('chat.micDenied');
+        if (el.voiceStatus) el.voiceStatus.textContent = t('chat.micDenied');
       }
     }
 
     function stopListening() {
       if (chat.recognition) {
-        try { chat.recognition.abort(); } catch (err) { /* noop */ }
+        try { chat.recognition.abort(); } catch (_) {}
       }
       chat.listening = false;
       updateVoiceUI();
@@ -166,12 +327,16 @@
         addBot(t('chat.voiceUnsupported'), { speak: false, chips: ['advisor', 'projects'] });
         return;
       }
+      unlockAudioPolicy();
+      refreshVoices();
+
       chat.voiceOpen = true;
-      el.voice.hidden = false;
-      el.voiceStatus.textContent = t('voice.tap');
-      el.voiceTranscript.textContent = '';
+      if (el.voice) el.voice.hidden = false;
+      if (el.voiceStatus) el.voiceStatus.textContent = t('voice.tap') || 'Toca para hablar';
+      if (el.voiceTranscript) el.voiceTranscript.textContent = '';
       updateVoiceUI();
-      window.setTimeout(startListening, 350);
+
+      window.setTimeout(startListening, 300);
     }
 
     function closeVoice() {
@@ -181,11 +346,7 @@
       if (el.voice) el.voice.hidden = true;
       if (el.voiceStatus) el.voiceStatus.textContent = t('voice.tap');
       if (el.voiceTranscript) el.voiceTranscript.textContent = '';
-      if (chat.open) el.text?.focus();
-    }
-
-    if (synth) {
-      synth.addEventListener?.('voiceschanged', () => { /* voces cargadas en el próximo speak */ });
+      if (chat.open && el.text) el.text.focus();
     }
 
     return {
@@ -195,10 +356,11 @@
       startListening,
       stopListening,
       openVoice,
-      closeVoice
+      closeVoice,
+      selectBestVoice
     };
   }
 
   S.createVoiceController = createVoiceController;
+  S.selectBestVoice = selectBestVoice;
 })();
-
