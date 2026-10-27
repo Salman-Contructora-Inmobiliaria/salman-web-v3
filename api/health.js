@@ -25,6 +25,16 @@ module.exports = async function handler(req, res) {
     timestamp: new Date().toISOString()
   };
 
+  if (req.query && req.query.list === '1' && isConfigured) {
+    try {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+      const listData = await resp.json();
+      data.availableModels = (listData.models || []).map(m => m.name.replace('models/', ''));
+    } catch (e) {
+      data.listError = e.message;
+    }
+  }
+
   if (req.query && req.query.test === '1' && isConfigured) {
     try {
       const test = await generateReply({
